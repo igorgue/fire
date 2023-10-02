@@ -1,5 +1,4 @@
-from fire import Request, Response
-from fire import route as r
+from fire import Request, Response, app, route as r
 
 
 fn index(request: Request) -> Response:
@@ -19,4 +18,4 @@ fn main():
     r["/posts"](posts)
     r["/posts/{id}"](get_post)
 
-    # app.run()
+    app.run()
