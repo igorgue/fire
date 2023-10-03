@@ -1,3 +1,4 @@
+from time import time
 from python import Python, Dictionary
 from memory import memcpy, memset_zero
 
@@ -19,6 +20,7 @@ alias RESPONSE_BUFFER_SIZE = 30000
 alias HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
 alias HOST = "0.0.0.0"
 alias PORT = 8000
+alias DEBUG = True
 
 var app = Application()
 var routes = Routes()
@@ -169,8 +171,7 @@ struct Response:
         resp.content_type = "application/json"
 
         try:
-            let json = Python.import_module("json")
-            let content = json.dumps(data.py_object)
+            let content = py_json.dumps(data.py_object)
 
             resp.content = to_string_ref(content.to_string())
         except e:
@@ -186,8 +187,7 @@ struct Response:
         resp.content_type = "application/json"
 
         try:
-            let json = Python.import_module("json")
-            let content = json.dumps(data)
+            let content = py_json.dumps(data)
 
             resp.content = to_string_ref(content.to_string())
         except e:
@@ -227,6 +227,14 @@ struct Response:
         )
 
 
+fn http_404() -> Response:
+    return Response.http_404()
+
+
+fn http_500() -> Response:
+    return Response.http_500()
+
+
 fn json(data: Dictionary) -> Response:
     return Response.json_response(data)
 
@@ -244,9 +252,13 @@ struct Request:
     var url: StringRef
     var method: StringRef
     var protocol_version: StringRef
-    var query_string: StringRef
-    var params: DynamicVector[StringRef]
+    var _qs: StringRef
+    var _data: StringRef
+    var _params: DynamicVector[StringRef]
+
     var PARAMS: Dictionary
+    var QS: Dictionary
+    var DATA: Dictionary
 
     fn __init__(
         inout self,
@@ -257,17 +269,50 @@ struct Request:
         self.url = url
         self.method = method
         self.protocol_version = protocol_version
-        self.query_string = ""
-        self.params = DynamicVector[StringRef]()
-        self.PARAMS = Python.dict()
+
+        self._qs = ""
+        self._data = ""
+        self._params = DynamicVector[StringRef]()
+
+        self.PARAMS = py_dict()
+        self.QS = py_dict()
+        self.DATA = py_dict()
 
     fn get_params_dict(self) -> Dictionary:
-        let res = Python.dict()
+        let res = py_dict()
 
         try:
             var i = 0
-            while i < len(self.params):
-                res[self.params[i]] = self.params[i + 1]
+            while i < len(self._params):
+                res[self._params[i]] = self._params[i + 1]
+                i += 2
+        except e:
+            print_no_newline("> error:", e.value)
+            print("returning empty dict")
+
+        return res
+
+    fn get_qs_dict(self) -> Dictionary:
+        let res = py_dict()
+
+        try:
+            var i = 0
+            while i < len(self._params):
+                res[self._params[i]] = self._params[i + 1]
+                i += 2
+        except e:
+            print_no_newline("> error:", e.value)
+            print("returning empty dict")
+
+        return res
+
+    fn get_data_dict(self) -> Dictionary:
+        let res = py_dict()
+
+        try:
+            var i = 0
+            while i < len(self._params):
+                res[self._params[i]] = self._params[i + 1]
                 i += 2
         except e:
             print_no_newline("> error:", e.value)
@@ -357,6 +402,19 @@ fn find_pattern(path: String) -> StringRef:
     return ""
 
 
+var py_json: PythonObject = None
+var py_dict = Python.dict
+
+
+fn load_python_modules():
+    """Preload python modules to avoid loading them on the first request."""
+    try:
+        py_json = Python.import_module("json")
+    except e:
+        print("> error loading python module:", e.value)
+        exit(-1)
+
+
 @value
 @register_passable("trivial")
 struct Application:
@@ -367,6 +425,8 @@ struct Application:
         return Self {host: HOST, port: PORT}
 
     fn run(self):
+        load_python_modules()
+
         let socketfd: Int32
         let client_socketfd: Int32
 
@@ -404,15 +464,18 @@ struct Application:
             return
 
         print(
-            "Started 🔥 on http://localhost:" + String(app.port) + " (CTRL + C to quit)"
+            "> started 🔥 on http://localhost:"
+            + String(app.port)
+            + " (CTRL + C to quit)"
         )
 
         let not_found = Response.http_404().to_string()
         let not_found_len = len(not_found)
+        var start: Int = 0
+        var bytes_received: Int32 = 0
 
         while True:
-            print("> waiting for new connection...")
-
+            let buf = Pointer[UInt8].alloc(REQUEST_BUFFER_SIZE)
             var sin_size = UInt32(sizeof[UInt32]())
             client_socketfd = accept(socketfd, address_sock, sin_size)
 
@@ -420,12 +483,17 @@ struct Application:
                 print("accept")
                 return
 
-            let buf = Pointer[UInt8].alloc(30000)
-            _ = read(client_socketfd, buf, 30000)
+            if DEBUG:
+                start = time.now()
 
-            let method = self.get_method(buf, 30000)
-            let path = self.get_path(buf, 30000)
-            let protocol_version = self.get_protocol_version(buf, 30000)
+            bytes_received = read(client_socketfd, buf, REQUEST_BUFFER_SIZE)
+
+            let method = self.get_method(buf, REQUEST_BUFFER_SIZE)
+            let path = self.get_path(buf, REQUEST_BUFFER_SIZE)
+            let protocol_version = self.get_protocol_version(buf, REQUEST_BUFFER_SIZE)
+
+            if DEBUG:
+                print_no_newline("[" + method + "]", path)
 
             let handler: fn (Request) -> Response
             try:
@@ -438,30 +506,32 @@ struct Application:
 
                 continue
 
-            let params = self.get_params(buf, 30000, find_pattern(path))
+            let params_data = self.get_params(
+                buf, REQUEST_BUFFER_SIZE, find_pattern(path)
+            )
 
             var req = Request(
                 to_string_ref(path),
                 to_string_ref(method),
                 to_string_ref(protocol_version),
             )
-            req.params = params
+            req._params = params_data
             req.PARAMS = req.get_params_dict()
-
-            # try:
-            #     print("> params:", req.params_dict().items())
-            # except e:
-            #     pass
-
-            # for i in range(len(req.params)):
-            #     print("> param:", req.params[i], len(req.params[i]))
 
             let res = handler(req).to_string()
 
             _ = write(client_socketfd, res, len(res))
-            _ = close(client_socketfd)
 
-            print("> response sent")
+            if DEBUG:
+                let total = (time.now() - start) // 1000
+                if total > 1000:
+                    print(
+                        " " + String(total // 1000) + " ms " + bytes_received + " bytes"
+                    )
+                else:
+                    print(" " + String(total) + " µs " + bytes_received + " bytes")
+
+            _ = close(client_socketfd)
 
     @always_inline
     fn get_method(self, buf: Pointer[UInt8], buflen: Int) -> String:
@@ -546,12 +616,8 @@ struct Application:
         var res = DynamicVector[StringRef]()
         let path = self.get_path(buf, buflen)
 
-        print("> path:", path)
-        print("> len(path):", len(path))
-
         var i = 0
         var j = 0
-        print("> pattern:", path)
         while i < len(path):
             if (
                 path[i] == " "

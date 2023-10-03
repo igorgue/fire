@@ -1,4 +1,4 @@
-from fire import Request, Response, app, route as r, json
+from fire import Request, Response, app, route as r, json, http_500
 
 
 fn index(request: Request) -> Response:
@@ -14,7 +14,7 @@ fn get_post(request: Request) -> Response:
 
 
 fn see_500(request: Request) -> Response:
-    return Response.http_500()
+    return http_500()
 
 
 fn main():
