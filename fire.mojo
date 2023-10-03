@@ -246,15 +246,35 @@ struct Application:
             let buf = Pointer[UInt8].alloc(30000)
             _ = read(client_socketfd, buf, 30000)
 
+            let method = self.get_method(buf, 30000)
             let path = self.get_path(buf, 30000)
+            let protocol_version = self.get_protocol_version(buf, 30000)
+
             let handler = find_handler(path)
 
+            print("> method:", method)
             print("> path:", path)
+            print("> protocol_version:", protocol_version)
 
             _ = write(client_socketfd, hello, len(hello))
 
             print("> hello sent")
             _ = close(client_socketfd)
+
+    @always_inline
+    fn get_method(self, buf: Pointer[UInt8], len: Int) -> String:
+        var i = 0
+
+        # skip method
+        while i < len:
+            if buf[i] == ord(" "):
+                break
+            i += 1
+
+        let ptr = Pointer[UInt8].alloc(i)
+        memcpy(ptr, buf, i)
+
+        return String(ptr.bitcast[Int8](), i)
 
     @always_inline
     fn get_path(self, buf: Pointer[UInt8], len: Int) -> String:
@@ -276,6 +296,39 @@ struct Application:
             j += 1
 
         # write path
+        let ptr = Pointer[UInt8].alloc(j - i)
+        memcpy(ptr, buf.offset(i), j - i)
+
+        return String(ptr.bitcast[Int8](), j - i)
+
+    @always_inline
+    fn get_protocol_version(self, buf: Pointer[UInt8], len: Int) -> String:
+        var i = 0
+
+        # skip method
+        while i < len:
+            if buf[i] == ord(" "):
+                break
+            i += 1
+
+        i += 1
+
+        # skip path
+        while i < len:
+            if buf[i] == ord(" "):
+                break
+            i += 1
+
+        i += 1
+        var j = i
+
+        # skip protocol version
+        while j < len:
+            if buf[j] == ord("\n"):
+                break
+            j += 1
+
+        # write protocol version
         let ptr = Pointer[UInt8].alloc(j - i)
         memcpy(ptr, buf.offset(i), j - i)
 
