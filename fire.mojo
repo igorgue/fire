@@ -153,11 +153,10 @@ struct Response:
 
         return resp
 
+    # top level dict
     @staticmethod
     fn json_response(data: Dictionary) -> Response:
         var resp = Response()
-        resp.status = 200
-        resp.status_text = "OK"
         resp.content_type = "application/json"
 
         try:
@@ -166,15 +165,15 @@ struct Response:
 
             resp.content = to_string_ref(content.to_string())
         except e:
+            print("> error:", e.value)
             resp.content = to_string_ref("{}")
 
         return resp
 
+    # top level list
     @staticmethod
     fn json_response(data: PythonObject) -> Response:
         var resp = Response()
-        resp.status = 200
-        resp.status_text = "OK"
         resp.content_type = "application/json"
 
         try:
@@ -183,7 +182,8 @@ struct Response:
 
             resp.content = to_string_ref(content.to_string())
         except e:
-            resp.content = to_string_ref("{}")
+            print("> error:", e.value)
+            resp.content = to_string_ref("[]")
 
         return resp
 
