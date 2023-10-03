@@ -1,3 +1,6 @@
+from python import Python, Dictionary
+from memory import memcpy, memset_zero
+
 alias __version__ = "0.0.1"
 alias __version_tag__ = "pre-alpha"
 
@@ -178,6 +181,16 @@ struct Request:
         self.query_string = ""
         self.params = DynamicVector[StringRef]()
 
+    fn params_dict(inout self) raises -> Dictionary:
+        let res = Python.dict()
+
+        var i = 0
+        while i < len(self.params):
+            res[self.params[i]] = self.params[i + 1]
+            i += 2
+
+        return res
+
 
 struct Routes:
     var paths: InlinedFixedVector[ROUTES_CAPACITY, StringRef]
@@ -203,12 +216,12 @@ fn to_string_ref(s: String) -> StringRef:
     let ptr = Pointer[Int8]().alloc(slen + 1)
 
     memcpy(ptr, s._buffer.data.bitcast[Int8](), slen)
-    ptr.store(slen + 1, 0)
+    memset_zero(ptr.offset(slen), 1)
 
     return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen)
 
 
-fn match_path(path: StringRef, pattern: StringRef) -> Bool:
+fn match_path(path: String, pattern: StringRef) -> Bool:
     let path_len = len(path)
     let pattern_len = len(pattern)
 
@@ -237,11 +250,10 @@ fn match_path(path: StringRef, pattern: StringRef) -> Bool:
 
 
 fn find_handler(path: String) raises -> fn (req: Request) -> Response:
-    let path_ref = to_string_ref(path)
     var i = 0
 
     while i < routes.size:
-        if match_path(path_ref, routes.paths[i]):
+        if match_path(path, routes.paths[i]):
             return routes.handlers[i]
 
         i += 1
@@ -250,11 +262,10 @@ fn find_handler(path: String) raises -> fn (req: Request) -> Response:
 
 
 fn find_pattern(path: String) -> StringRef:
-    let path_ref = to_string_ref(path)
     var i = 0
 
     while i < routes.size:
-        if match_path(path_ref, routes.paths[i]):
+        if match_path(path, routes.paths[i]):
             return routes.paths[i]
 
         i += 1
@@ -271,7 +282,7 @@ struct Application:
     fn __init__() -> Self:
         return Self {host: HOST, port: PORT}
 
-    fn run(self) -> None:
+    fn run(self):
         let socketfd: Int32
         let client_socketfd: Int32
 
@@ -352,8 +363,13 @@ struct Application:
             )
             req.params = params
 
-            for i in range(len(req.params)):
-                print("> param:", req.params[i], len(req.params[i]))
+            # try:
+            #     print("> params:", req.params_dict().items())
+            # except e:
+            #     pass
+
+            # for i in range(len(req.params)):
+            #     print("> param:", req.params[i], len(req.params[i]))
 
             let res = handler(req).to_string()
 
@@ -450,11 +466,12 @@ struct Application:
 
         var i = 0
         var j = 0
+        print("> pattern:", path)
         while i < len(path):
             if (
                 path[i] == " "
                 or path[i] == "?"
-                or ord(path[i]) == 0
+                or ord(path[i]) < 31
                 or ord(path[i]) > 128
             ):
                 break
@@ -474,7 +491,7 @@ struct Application:
                 while (
                     path[i] != "/"
                     and path[i] != " "
-                    and ord(path[i]) != 0
+                    and ord(path[i]) > 31
                     and ord(path[i]) < 128
                 ):
                     i += 1
@@ -485,7 +502,7 @@ struct Application:
             if (
                 path[i] == " "
                 or path[i] == "?"
-                or ord(path[i]) == 0
+                or ord(path[i]) < 31
                 or ord(path[i]) > 128
             ):
                 break

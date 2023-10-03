@@ -10,6 +10,14 @@ fn posts(request: Request) -> Response:
 
 
 fn get_post(request: Request) -> Response:
+    var i = 0
+
+    # while i < len(request.params):
+    #     print("name:", request.params[i])
+    #     print("value:", request.params[i + 1])
+    #
+    #     i += 2
+
     return Response("at get post")
 
 
