@@ -1,3 +1,5 @@
+alias __version__ = "0.0.1"
+alias __version_tag__ = "pre-alpha"
 alias AF_INET = 2
 alias SOCK_STREAM = 1
 alias SO_REUSEADDR = 2
@@ -116,10 +118,39 @@ alias PORT = 8000
 @register_passable("trivial")
 struct Response:
     var status: Int
+    var status_text: StringRef
     var content: StringRef
 
     fn __init__() -> Self:
-        return Self {status: 200, content: ""}
+        return Self {status: 200, status_text: "OK", content: ""}
+
+    fn __init__(content: String) -> Self:
+        return Self {status: 200, status_text: "OK", content: to_string_ref(content)}
+
+    @staticmethod
+    fn http_404() -> Response:
+        var resp = Response()
+        resp.status = 404
+        resp.status_text = "Not Found"
+        resp.content = "Not found"
+
+        return resp
+
+    fn to_string(self) -> String:
+        return (
+            "HTTP/1.1 "
+            + String(self.status)
+            + " "
+            + self.status_text
+            + "\nContent-Type: text/plain\nServer: Fire🔥/"
+            + __version__
+            + " ("
+            + __version_tag__
+            + ")\nContent-Length: "
+            + String(len(self.content))
+            + "\n\n"
+            + self.content
+        )
 
 
 @value
@@ -190,15 +221,13 @@ struct Application:
     fn __init__() -> Self:
         return Self {host: HOST, port: PORT}
 
-    fn run(self) raises -> None:
+    fn run(self) -> None:
         let socketfd: Int32
         let client_socketfd: Int32
 
         var address = sockaddr_in()
         var opt: UInt8 = SO_REUSEADDR
         let addrlen = sizeof[sockaddr_in]()
-
-        let hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!"
 
         socketfd = socket(AF_INET, SOCK_STREAM, 0)
         if socketfd < 0:
@@ -250,16 +279,27 @@ struct Application:
             let path = self.get_path(buf, 30000)
             let protocol_version = self.get_protocol_version(buf, 30000)
 
-            let handler = find_handler(path)
+            try:
+                let handler = find_handler(path)
 
-            print("> method:", method)
-            print("> path:", path)
-            print("> protocol_version:", protocol_version)
+                # print("> method:", method)
+                # print("> path:", path)
+                # print("> protocol_version:", protocol_version)
 
-            _ = write(client_socketfd, hello, len(hello))
+                let req = Request(to_string_ref(path), to_string_ref(method), "")
+                let res = handler(req).to_string()
 
-            print("> hello sent")
-            _ = close(client_socketfd)
+                _ = write(client_socketfd, res, len(res))
+                _ = close(client_socketfd)
+
+                print("> response sent")
+            except e:
+                let res = Response.http_404().to_string()
+
+                _ = write(client_socketfd, res, len(res))
+                _ = close(client_socketfd)
+
+                print("> error:", e.value)
 
     @always_inline
     fn get_method(self, buf: Pointer[UInt8], len: Int) -> String:
