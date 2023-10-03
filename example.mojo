@@ -1,4 +1,4 @@
-from fire import Request, Response, app, route as r
+from fire import Request, Response, app, route as r, json
 
 
 fn index(request: Request) -> Response:
@@ -10,7 +10,7 @@ fn posts(request: Request) -> Response:
 
 
 fn get_post(request: Request) -> Response:
-    return Response.json_response(request.params_dict())
+    return json(request.PARAMS)
 
 
 fn see_500(request: Request) -> Response:

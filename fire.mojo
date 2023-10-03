@@ -196,6 +196,16 @@ struct Response:
 
         return resp
 
+    # with a string
+    @staticmethod
+    fn json_response(data: String) -> Response:
+        var resp = Response()
+        resp.content_type = "application/json"
+
+        resp.content = to_string_ref(data)
+
+        return resp
+
     fn to_string(self) -> String:
         return (
             "HTTP/1.1 "
@@ -217,6 +227,18 @@ struct Response:
         )
 
 
+fn json(data: Dictionary) -> Response:
+    return Response.json_response(data)
+
+
+fn json(data: PythonObject) -> Response:
+    return Response.json_response(data)
+
+
+fn json(data: String) -> Response:
+    return Response.json_response(data)
+
+
 @value
 struct Request:
     var url: StringRef
@@ -224,6 +246,7 @@ struct Request:
     var protocol_version: StringRef
     var query_string: StringRef
     var params: DynamicVector[StringRef]
+    var PARAMS: Dictionary
 
     fn __init__(
         inout self,
@@ -236,8 +259,9 @@ struct Request:
         self.protocol_version = protocol_version
         self.query_string = ""
         self.params = DynamicVector[StringRef]()
+        self.PARAMS = Python.dict()
 
-    fn params_dict(self) -> Dictionary:
+    fn get_params_dict(self) -> Dictionary:
         let res = Python.dict()
 
         try:
@@ -422,6 +446,7 @@ struct Application:
                 to_string_ref(protocol_version),
             )
             req.params = params
+            req.PARAMS = req.get_params_dict()
 
             # try:
             #     print("> params:", req.params_dict().items())
