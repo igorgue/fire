@@ -3,6 +3,7 @@ from memory import memcpy, memset_zero
 
 alias __version__ = "0.0.1"
 alias __version_tag__ = "pre-alpha"
+alias __server__ = "Fire🔥"
 
 alias AF_INET = 2
 alias SOCK_STREAM = 1
@@ -128,12 +129,20 @@ struct Response:
     var status: Int
     var status_text: StringRef
     var content: StringRef
+    var content_type: StringRef
 
     fn __init__() -> Self:
-        return Self {status: 200, status_text: "OK", content: ""}
+        return Self {
+            status: 200, status_text: "OK", content: "", content_type: "text/plain"
+        }
 
     fn __init__(content: String) -> Self:
-        return Self {status: 200, status_text: "OK", content: to_string_ref(content)}
+        return Self {
+            status: 200,
+            status_text: "OK",
+            content: to_string_ref(content),
+            content_type: "text/plain",
+        }
 
     @staticmethod
     fn http_404() -> Response:
@@ -144,13 +153,51 @@ struct Response:
 
         return resp
 
+    @staticmethod
+    fn json_response(data: Dictionary) -> Response:
+        var resp = Response()
+        resp.status = 200
+        resp.status_text = "OK"
+        resp.content_type = "application/json"
+
+        try:
+            let json = Python.import_module("json")
+            let content = json.dumps(data.py_object)
+
+            resp.content = to_string_ref(content.to_string())
+        except e:
+            resp.content = to_string_ref("{}")
+
+        return resp
+
+    @staticmethod
+    fn json_response(data: PythonObject) -> Response:
+        var resp = Response()
+        resp.status = 200
+        resp.status_text = "OK"
+        resp.content_type = "application/json"
+
+        try:
+            let json = Python.import_module("json")
+            let content = json.dumps(data)
+
+            resp.content = to_string_ref(content.to_string())
+        except e:
+            resp.content = to_string_ref("{}")
+
+        return resp
+
     fn to_string(self) -> String:
         return (
             "HTTP/1.1 "
             + String(self.status)
             + " "
             + self.status_text
-            + "\nContent-Type: text/plain\nServer: Fire🔥/"
+            + "\nContent-Type: "
+            + self.content_type
+            + "\nServer: "
+            + __server__
+            + "/"
             + __version__
             + " ("
             + __version_tag__
@@ -181,13 +228,17 @@ struct Request:
         self.query_string = ""
         self.params = DynamicVector[StringRef]()
 
-    fn params_dict(inout self) raises -> Dictionary:
+    fn params_dict(self) -> Dictionary:
         let res = Python.dict()
 
-        var i = 0
-        while i < len(self.params):
-            res[self.params[i]] = self.params[i + 1]
-            i += 2
+        try:
+            var i = 0
+            while i < len(self.params):
+                res[self.params[i]] = self.params[i + 1]
+                i += 2
+        except e:
+            print_no_newline("> error:", e.value)
+            print("returning empty dict")
 
         return res
 
