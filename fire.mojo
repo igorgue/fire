@@ -1,4 +1,4 @@
-from time import time
+import time
 from python import Python, Dictionary
 from memory import memcpy, memset_zero
 
@@ -492,9 +492,6 @@ struct Application:
             let path = self.get_path(buf, REQUEST_BUFFER_SIZE)
             let protocol_version = self.get_protocol_version(buf, REQUEST_BUFFER_SIZE)
 
-            if DEBUG:
-                print_no_newline("[" + method + "]", path)
-
             let handler: fn (Request) -> Response
             try:
                 handler = find_handler(path)
@@ -523,13 +520,17 @@ struct Application:
             _ = write(client_socketfd, res, len(res))
 
             if DEBUG:
+                var log = "[" + method + "] " + path
+
                 let total = (time.now() - start) // 1000
                 if total > 1000:
-                    print(
+                    log += (
                         " " + String(total // 1000) + " ms " + bytes_received + " bytes"
                     )
                 else:
-                    print(" " + String(total) + " µs " + bytes_received + " bytes")
+                    log += " " + String(total) + " µs " + bytes_received + " bytes"
+
+                print(log)
 
             _ = close(client_socketfd)
 
