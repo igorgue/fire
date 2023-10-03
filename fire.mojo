@@ -1,5 +1,6 @@
 alias __version__ = "0.0.1"
 alias __version_tag__ = "pre-alpha"
+
 alias AF_INET = 2
 alias SOCK_STREAM = 1
 alias SO_REUSEADDR = 2
@@ -204,12 +205,41 @@ fn find_handler(path: String) raises -> fn (req: Request) -> Response:
         print("> checking path_ref:", path_ref)
         print("> checking path len:", len(routes.paths[i]))
         print("> checking path_ref len:", len(path_ref))
-        if routes.paths[i] == path_ref:
+
+        if match_path(path_ref, routes.paths[i]):
             print("> found handler for path:", path)
             return routes.handlers[i]
         i += 1
 
     raise Error("Route not found")
+
+
+fn match_path(path: StringRef, pattern: StringRef) -> Bool:
+    let path_len = len(path)
+    let pattern_len = len(pattern)
+
+    if pattern_len < path_len:
+        return False
+
+    var i = 0
+    var j = 0
+    while i < path_len:
+        if pattern[j] == "{":
+            while pattern[j] != "}":
+                j += 1
+
+            while path[i] != "/" and path[i] != " ":
+                i += 1
+
+            continue
+
+        if path[i] != pattern[j]:
+            return False
+
+        i += 1
+        j += 1
+
+    return True
 
 
 @value
@@ -262,6 +292,9 @@ struct Application:
             "Started 🔥 on http://localhost:" + String(app.port) + " (CTRL + C to quit)"
         )
 
+        let not_found = Response.http_404().to_string()
+        let not_found_len = len(not_found)
+
         while True:
             print("> waiting for new connection...")
 
@@ -279,34 +312,35 @@ struct Application:
             let path = self.get_path(buf, 30000)
             let protocol_version = self.get_protocol_version(buf, 30000)
 
+            let handler: fn (Request) -> Response
             try:
-                let handler = find_handler(path)
-
-                # print("> method:", method)
-                # print("> path:", path)
-                # print("> protocol_version:", protocol_version)
-
-                let req = Request(to_string_ref(path), to_string_ref(method), "")
-                let res = handler(req).to_string()
-
-                _ = write(client_socketfd, res, len(res))
-                _ = close(client_socketfd)
-
-                print("> response sent")
+                handler = find_handler(path)
             except e:
-                let res = Response.http_404().to_string()
-
-                _ = write(client_socketfd, res, len(res))
+                _ = write(client_socketfd, not_found, not_found_len)
                 _ = close(client_socketfd)
 
                 print("> error:", e.value)
 
+                continue
+
+            # print("> method:", method)
+            # print("> path:", path)
+            # print("> protocol_version:", protocol_version)
+
+            let req = Request(to_string_ref(path), to_string_ref(method), "")
+            let res = handler(req).to_string()
+
+            _ = write(client_socketfd, res, len(res))
+            _ = close(client_socketfd)
+
+            print("> response sent")
+
     @always_inline
-    fn get_method(self, buf: Pointer[UInt8], len: Int) -> String:
+    fn get_method(self, buf: Pointer[UInt8], buflen: Int) -> String:
         var i = 0
 
         # skip method
-        while i < len:
+        while i < buflen:
             if buf[i] == ord(" "):
                 break
             i += 1
@@ -317,11 +351,11 @@ struct Application:
         return String(ptr.bitcast[Int8](), i)
 
     @always_inline
-    fn get_path(self, buf: Pointer[UInt8], len: Int) -> String:
+    fn get_path(self, buf: Pointer[UInt8], buflen: Int) -> String:
         var i = 0
 
         # skip method
-        while i < len:
+        while i < buflen:
             if buf[i] == ord(" "):
                 break
             i += 1
@@ -330,7 +364,7 @@ struct Application:
         var j = i
 
         # skip path
-        while j < len:
+        while j < buflen:
             if buf[j] == ord(" "):
                 break
             j += 1
@@ -342,11 +376,11 @@ struct Application:
         return String(ptr.bitcast[Int8](), j - i)
 
     @always_inline
-    fn get_protocol_version(self, buf: Pointer[UInt8], len: Int) -> String:
+    fn get_protocol_version(self, buf: Pointer[UInt8], buflen: Int) -> String:
         var i = 0
 
         # skip method
-        while i < len:
+        while i < buflen:
             if buf[i] == ord(" "):
                 break
             i += 1
@@ -354,7 +388,7 @@ struct Application:
         i += 1
 
         # skip path
-        while i < len:
+        while i < buflen:
             if buf[i] == ord(" "):
                 break
             i += 1
@@ -363,7 +397,7 @@ struct Application:
         var j = i
 
         # skip protocol version
-        while j < len:
+        while j < buflen:
             if buf[j] == ord("\n"):
                 break
             j += 1
