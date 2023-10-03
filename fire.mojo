@@ -8,6 +8,17 @@ alias SOL_SOCKET = 1
 alias SO_REUSEPORT = 15
 alias INADDR_ANY = 0x00000000
 
+alias ROUTES_CAPACITY = 256
+
+alias REQUEST_BUFFER_SIZE = 30000
+alias RESPONSE_BUFFER_SIZE = 30000
+alias HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+alias HOST = "0.0.0.0"
+alias PORT = 8000
+
+var app = Application()
+var routes = Routes()
+
 
 @value
 @register_passable("trivial")
@@ -108,13 +119,6 @@ fn exit(status: Int32):
     _ = external_call["exit", UInt8, Int32](status)
 
 
-alias REQUEST_BUFFER_SIZE = 30000
-alias RESPONSE_BUFFER_SIZE = 30000
-alias HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
-alias HOST = "0.0.0.0"
-alias PORT = 8000
-
-
 @value
 @register_passable("trivial")
 struct Response:
@@ -155,14 +159,24 @@ struct Response:
 
 
 @value
-@register_passable("trivial")
 struct Request:
     var url: StringRef
     var method: StringRef
+    var protocol_version: StringRef
     var query_string: StringRef
+    var params: DynamicVector[StringRef]
 
-
-alias ROUTES_CAPACITY = 256
+    fn __init__(
+        inout self,
+        url: StringRef,
+        method: StringRef,
+        protocol_version: StringRef,
+    ):
+        self.url = url
+        self.method = method
+        self.protocol_version = protocol_version
+        self.query_string = ""
+        self.params = DynamicVector[StringRef]()
 
 
 struct Routes:
@@ -178,9 +192,6 @@ struct Routes:
         ](ROUTES_CAPACITY)
 
 
-var routes = Routes()
-
-
 fn route[path: StringLiteral](handler: fn (req: Request) -> Response):
     routes.paths.append(path)
     routes.handlers.append(handler)
@@ -194,24 +205,6 @@ fn to_string_ref(s: String) -> StringRef:
     memcpy(ptr, s._buffer.data.bitcast[Int8](), slen)
 
     return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen)
-
-
-fn find_handler(path: String) raises -> fn (req: Request) -> Response:
-    let path_ref = to_string_ref(path)
-    var i = 0
-
-    while i < routes.size:
-        print("> checking path:", routes.paths[i])
-        print("> checking path_ref:", path_ref)
-        print("> checking path len:", len(routes.paths[i]))
-        print("> checking path_ref len:", len(path_ref))
-
-        if match_path(path_ref, routes.paths[i]):
-            print("> found handler for path:", path)
-            return routes.handlers[i]
-        i += 1
-
-    raise Error("Route not found")
 
 
 fn match_path(path: StringRef, pattern: StringRef) -> Bool:
@@ -240,6 +233,32 @@ fn match_path(path: StringRef, pattern: StringRef) -> Bool:
         j += 1
 
     return True
+
+
+fn find_handler(path: String) raises -> fn (req: Request) -> Response:
+    let path_ref = to_string_ref(path)
+    var i = 0
+
+    while i < routes.size:
+        if match_path(path_ref, routes.paths[i]):
+            return routes.handlers[i]
+
+        i += 1
+
+    raise Error("Route not found")
+
+
+fn find_pattern(path: String) -> StringRef:
+    let path_ref = to_string_ref(path)
+    var i = 0
+
+    while i < routes.size:
+        if match_path(path_ref, routes.paths[i]):
+            return routes.paths[i]
+
+        i += 1
+
+    return ""
 
 
 @value
@@ -323,11 +342,18 @@ struct Application:
 
                 continue
 
-            # print("> method:", method)
-            # print("> path:", path)
-            # print("> protocol_version:", protocol_version)
+            let params = self.get_params(buf, 30000, find_pattern(path))
 
-            let req = Request(to_string_ref(path), to_string_ref(method), "")
+            var req = Request(
+                to_string_ref(path),
+                to_string_ref(method),
+                to_string_ref(protocol_version),
+            )
+            req.params = params
+
+            for i in range(len(req.params)):
+                print("> param:", req.params[i], len(req.params[i]))
+
             let res = handler(req).to_string()
 
             _ = write(client_socketfd, res, len(res))
@@ -408,5 +434,60 @@ struct Application:
 
         return String(ptr.bitcast[Int8](), j - i)
 
+    @always_inline
+    fn get_params(
+        self, buf: Pointer[UInt8], buflen: Int, pattern: StringRef
+    ) -> DynamicVector[StringRef]:
+        let pattern_string = String(pattern)
+        var res = DynamicVector[StringRef]()
+        let path = self.get_path(buf, buflen)
 
-var app = Application()
+        print("> path:", path)
+        print("> len(path):", len(path))
+
+        var i = 0
+        var j = 0
+        while i < len(path):
+            if (
+                path[i] == " "
+                or path[i] == "?"
+                or ord(path[i]) == 0
+                or ord(path[i]) > 128
+            ):
+                break
+
+            if pattern[j] == "{":
+                let name_start = j + 1
+
+                while pattern[j] != "}":
+                    j += 1
+
+                let name_end = j
+                let name = pattern_string[name_start:name_end]
+
+                res.push_back(to_string_ref(name))
+
+                let value_start = i
+                while (
+                    path[i] != "/"
+                    and path[i] != " "
+                    and ord(path[i]) != 0
+                    and ord(path[i]) < 128
+                ):
+                    i += 1
+                let value_end = i
+                let value = path[value_start:value_end]
+                res.push_back(to_string_ref(value))
+
+            if (
+                path[i] == " "
+                or path[i] == "?"
+                or ord(path[i]) == 0
+                or ord(path[i]) > 128
+            ):
+                break
+
+            i += 1
+            j += 1
+
+        return res
