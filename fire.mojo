@@ -200,9 +200,10 @@ fn route[path: StringLiteral](handler: fn (req: Request) -> Response):
 
 fn to_string_ref(s: String) -> StringRef:
     let slen = len(s)
-    let ptr = Pointer[Int8]().alloc(slen)
+    let ptr = Pointer[Int8]().alloc(slen + 1)
 
     memcpy(ptr, s._buffer.data.bitcast[Int8](), slen)
+    ptr.store(slen + 1, 0)
 
     return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen)
 
@@ -371,8 +372,9 @@ struct Application:
                 break
             i += 1
 
-        let ptr = Pointer[UInt8].alloc(i)
+        let ptr = Pointer[UInt8].alloc(i + 1)
         memcpy(ptr, buf, i)
+        ptr.store(i + 1, 0)
 
         return String(ptr.bitcast[Int8](), i)
 
@@ -396,8 +398,9 @@ struct Application:
             j += 1
 
         # write path
-        let ptr = Pointer[UInt8].alloc(j - i)
+        let ptr = Pointer[UInt8].alloc(j - i + 1)
         memcpy(ptr, buf.offset(i), j - i)
+        ptr.store(j - i + 1, 0)
 
         return String(ptr.bitcast[Int8](), j - i)
 
