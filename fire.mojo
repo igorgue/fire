@@ -105,6 +105,82 @@ fn exit(status: Int32):
     _ = external_call["exit", UInt8, Int32](status)
 
 
+alias REQUEST_BUFFER_SIZE = 30000
+alias RESPONSE_BUFFER_SIZE = 30000
+alias HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
+alias HOST = "0.0.0.0"
+alias PORT = 8000
+
+
+@value
+@register_passable("trivial")
+struct Response:
+    var status: Int
+    var content: StringRef
+
+    fn __init__() -> Self:
+        return Self {status: 200, content: ""}
+
+
+@value
+@register_passable("trivial")
+struct Request:
+    var url: StringRef
+    var method: StringRef
+    var query_string: StringRef
+
+
+alias ROUTES_CAPACITY = 256
+
+
+struct Routes:
+    var paths: InlinedFixedVector[ROUTES_CAPACITY, StringRef]
+    var handlers: InlinedFixedVector[ROUTES_CAPACITY, fn (req: Request) -> Response]
+    var size: Int
+
+    fn __init__(inout self: Self):
+        self.size = 0
+        self.paths = InlinedFixedVector[ROUTES_CAPACITY, StringRef](ROUTES_CAPACITY)
+        self.handlers = InlinedFixedVector[
+            ROUTES_CAPACITY, fn (req: Request) -> Response
+        ](ROUTES_CAPACITY)
+
+
+var routes = Routes()
+
+
+fn route[path: StringLiteral](handler: fn (req: Request) -> Response):
+    routes.paths.append(path)
+    routes.handlers.append(handler)
+    routes.size += 1
+
+
+fn to_string_ref(s: String) -> StringRef:
+    let slen = len(s)
+    let ptr = Pointer[Int8]().alloc(slen)
+
+    memcpy(ptr, s._buffer.data.bitcast[Int8](), slen)
+
+    return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen)
+
+
+fn find_handler(path: String) raises -> fn (req: Request) -> Response:
+    let path_ref = to_string_ref(path)
+    var i = 0
+
+    while i < routes.size:
+        print("> checking path:", routes.paths[i])
+        print("> checking path_ref:", path_ref)
+        print("> checking path len:", len(routes.paths[i]))
+        print("> checking path_ref len:", len(path_ref))
+        if routes.paths[i] == path_ref:
+            print("> found handler for path:", path)
+            return routes.handlers[i]
+        i += 1
+
+    raise Error("Route not found")
+
+
 @value
 @register_passable("trivial")
 struct Application:
@@ -112,36 +188,98 @@ struct Application:
     var port: UInt16
 
     fn __init__() -> Self:
-        return Self {host: "0.0.0.0", port: 8000}
+        return Self {host: HOST, port: PORT}
 
-    fn run(self) -> None:
-        print("Running server on", self.host, "port", self.port)
+    fn run(self) raises -> None:
+        let socketfd: Int32
+        let client_socketfd: Int32
+
+        var address = sockaddr_in()
+        var opt: UInt8 = SO_REUSEADDR
+        let addrlen = sizeof[sockaddr_in]()
+
+        let hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!"
+
+        socketfd = socket(AF_INET, SOCK_STREAM, 0)
+        if socketfd < 0:
+            print("socket creation failed")
+            return
+
+        if (
+            setsockopt(
+                socketfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, opt, sizeof[Int32]()
+            )
+            < 0
+        ):
+            print("setsockopt")
+            return
+
+        address.sin_family = AF_INET
+        address.sin_addr.s_addr = INADDR_ANY  # TODO: use app.host
+        address.sin_port = htons(app.port)
+
+        var address_sock = Pointer[sockaddr_in].address_of(address).bitcast[
+            sockaddr
+        ]().load()
+        if bind(socketfd, address_sock, addrlen) < 0:
+            print("bind failed")
+            return
+
+        if listen(socketfd, 10) < 0:
+            print("listen")
+            return
+
+        print(
+            "Started 🔥 on http://localhost:" + String(app.port) + " (CTRL + C to quit)"
+        )
+
+        while True:
+            print("> waiting for new connection...")
+
+            var sin_size = UInt32(sizeof[UInt32]())
+            client_socketfd = accept(socketfd, address_sock, sin_size)
+
+            if client_socketfd < 0:
+                print("accept")
+                return
+
+            let buf = Pointer[UInt8].alloc(30000)
+            _ = read(client_socketfd, buf, 30000)
+
+            let path = self.get_path(buf, 30000)
+            let handler = find_handler(path)
+
+            print("> path:", path)
+
+            _ = write(client_socketfd, hello, len(hello))
+
+            print("> hello sent")
+            _ = close(client_socketfd)
+
+    @always_inline
+    fn get_path(self, buf: Pointer[UInt8], len: Int) -> String:
+        var i = 0
+
+        # skip method
+        while i < len:
+            if buf[i] == ord(" "):
+                break
+            i += 1
+
+        i += 1
+        var j = i
+
+        # skip path
+        while j < len:
+            if buf[j] == ord(" "):
+                break
+            j += 1
+
+        # write path
+        let ptr = Pointer[UInt8].alloc(j - i)
+        memcpy(ptr, buf.offset(i), j - i)
+
+        return String(ptr.bitcast[Int8](), j - i)
 
 
 var app = Application()
-
-
-@value
-@register_passable
-struct Response:
-    var status: Int
-
-    fn __init__() -> Self:
-        return Self {status: 200}
-
-
-struct Request:
-    pass
-
-
-alias CAPACITY = 256
-
-var paths = DynamicVector[StringLiteral](CAPACITY)
-var handlers = DynamicVector[fn (req: Request) -> Response](CAPACITY)
-var size: UInt8 = 0
-
-
-fn route[path: StringLiteral](handler: fn (req: Request) -> Response):
-    paths.push_back(path)
-    handlers.push_back(handler)
-    size += 1
