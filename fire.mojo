@@ -153,6 +153,15 @@ struct Response:
 
         return resp
 
+    @staticmethod
+    fn http_500() -> Response:
+        var resp = Response()
+        resp.status = 500
+        resp.status_text = "Internal Server Error"
+        resp.content = "Internal Server Error"
+
+        return resp
+
     # top level dict
     @staticmethod
     fn json_response(data: Dictionary) -> Response:
