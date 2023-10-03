@@ -3,6 +3,7 @@ alias SOCK_STREAM = 1
 alias SO_REUSEADDR = 2
 alias SOL_SOCKET = 1
 alias SO_REUSEPORT = 15
+alias INADDR_ANY = 0x00000000
 
 
 @value
@@ -19,6 +20,14 @@ struct sockaddr_in:
     var sin_addr: in_addr
     var sin_zero: StaticTuple[8, UInt8]
 
+    fn __init__() -> Self:
+        return Self {
+            sin_family: 0,
+            sin_port: 0,
+            sin_addr: in_addr(0),
+            sin_zero: StaticTuple[8, UInt8](0),
+        }
+
 
 @value
 @register_passable("trivial")
@@ -33,21 +42,21 @@ fn socket(domain: Int32, socket_type: Int32, protocol: Int32) -> Int32:
     )
 
 
-fn bind(socket: Int32, address: Pointer[sockaddr], address_len: UInt32) -> Int32:
+fn bind(socket: Int32, inout address: sockaddr, address_len: UInt32) -> Int32:
     return external_call[
         "bind", Int32, Int32, Pointer[sockaddr], UInt32  # FnName, RetType  # Args
-    ](socket, address, address_len)
+    ](socket, Pointer[sockaddr].address_of(address), address_len)
 
 
 fn listen(socket: Int32, backlog: Int32) -> Int32:
     return external_call["listen", Int32, Int32, Int32](socket, backlog)
 
 
-fn accept(
-    socket: Int32, address: Pointer[sockaddr], address_len: Pointer[UInt32]
-) -> Int32:
+fn accept(socket: Int32, inout address: sockaddr, inout address_len: UInt32) -> Int32:
     return external_call["accept", Int32, Int32, Pointer[sockaddr], Pointer[UInt32]](
-        socket, address, address_len
+        socket,
+        Pointer[sockaddr].address_of(address),
+        Pointer[UInt32].address_of(address_len),
     )
 
 
@@ -55,12 +64,33 @@ fn setsockopt(
     socket: Int32,
     level: Int32,
     option_name: Int32,
-    option_value: Pointer[UInt8],
+    inout option_value: UInt8,
     option_len: UInt32,
 ) -> Int32:
     return external_call[
         "setsockopt", Int32, Int32, Int32, Int32, Pointer[UInt8], UInt32
-    ](socket, level, option_name, option_value, option_len)
+    ](socket, level, option_name, Pointer[UInt8].address_of(option_value), option_len)
+
+
+fn htons(hostshort: UInt16) -> UInt16:
+    return external_call["htons", UInt16, UInt16](hostshort)
+
+
+fn read(fildes: Int32, buf: Pointer[UInt8], nbyte: Int) -> Int32:
+    return external_call["read", Int, Int32, Pointer[UInt8], Int](fildes, buf, nbyte)
+
+
+fn write(fildes: Int32, s: String, nbyte: Int) -> Int32:
+    let slen = len(s)
+    let ptr = Pointer[UInt8]().alloc(slen)
+
+    memcpy(ptr, s._buffer.data.bitcast[UInt8](), slen)
+
+    return external_call["write", Int, Int32, Pointer[UInt8], Int](fildes, ptr, nbyte)
+
+
+fn close(fildes: Int32) -> Int32:
+    return external_call["close", Int32, Int32](fildes)
 
 
 fn perror(s: String):
