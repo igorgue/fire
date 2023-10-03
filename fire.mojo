@@ -25,6 +25,11 @@ alias DEBUG = True
 var app = Application()
 var routes = Routes()
 
+var py_json: PythonObject = None
+var py_dict = Python.dict
+
+alias r = route
+
 
 @value
 @register_passable("trivial")
@@ -252,6 +257,7 @@ struct Request:
     var url: StringRef
     var method: StringRef
     var protocol_version: StringRef
+
     var _qs: StringRef
     var _data: StringRef
     var _params: DynamicVector[StringRef]
@@ -402,10 +408,6 @@ fn find_pattern(path: String) -> StringRef:
     return ""
 
 
-var py_json: PythonObject = None
-var py_dict = Python.dict
-
-
 fn load_python_modules():
     """Preload python modules to avoid loading them on the first request."""
     try:
@@ -464,9 +466,7 @@ struct Application:
             return
 
         print(
-            "> started 🔥 on http://localhost:"
-            + String(app.port)
-            + " (CTRL + C to quit)"
+            "🔥 started on http://localhost:" + String(app.port) + " (CTRL + C to quit)"
         )
 
         let not_found = Response.http_404().to_string()
