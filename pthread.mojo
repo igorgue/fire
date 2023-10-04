@@ -40,12 +40,6 @@ struct pthread_mutex_t:
     var __align: Int64
 
     fn __init__(__kind: Int32) -> Self:
-        let prev_ptr = Pointer[__pthread_list_t].alloc(1)
-        let next_ptr = Pointer[__pthread_list_t].alloc(1)
-
-        memset_zero(prev_ptr, 1)
-        memset_zero(next_ptr, 1)
-
         return Self {
             __data: __pthread_mutex_s(
                 0,
@@ -55,10 +49,7 @@ struct pthread_mutex_t:
                 __kind,
                 0,
                 0,
-                __pthread_list_t(
-                    prev_ptr,
-                    next_ptr,
-                ),
+                __pthread_list_t(),
             ),
             __size: StaticTuple[__SIZEOF_PTHREAD_MUTEX_T, Int8](
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -70,8 +61,15 @@ struct pthread_mutex_t:
 @value
 @register_passable("trivial")
 struct __pthread_list_t:
-    var __prev: Pointer[__pthread_list_t]
-    var __next: Pointer[__pthread_list_t]
+    # FIXME: __prev and __next should be a pointers to __pthread_list_t
+    var __prev: Pointer[UInt8]
+    var __next: Pointer[UInt8]
+
+    fn __init__() -> Self:
+        return Self {
+            __prev: Pointer[UInt8].get_null(),
+            __next: Pointer[UInt8].get_null(),
+        }
 
 
 @value
