@@ -8,6 +8,8 @@ alias PTHREAD_MUTEX_RECURSIVE_NP = 1
 alias PTHREAD_MUTEX_ERRORCHECK_NP = 2
 alias PTHREAD_MUTEX_ADAPTIVE_NP = 3
 
+alias pthread_t = UInt64
+
 var task_queue: StaticTuple[THREAD_POOL_SIZE, Int32] = StaticTuple[
     THREAD_POOL_SIZE, Int32
 ](0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -135,5 +137,49 @@ struct __value32:
     var __high: UInt32
 
 
-fn pthread_mutex_lock(__mutex: pthread_mutex_t) -> Int32:
-    return __ret
+fn pthread_mutex_lock(inout __mutex: pthread_mutex_t) -> Int32:
+    return external_call["pthread_mutex_lock", Int32, Pointer[pthread_mutex_t]](
+        Pointer[pthread_mutex_t].address_of(__mutex)
+    )
+
+
+fn pthread_mutex_unlock(inout __mutex: pthread_mutex_t) -> Int32:
+    return external_call["pthread_mutex_unlock", Int32, Pointer[pthread_mutex_t]](
+        Pointer[pthread_mutex_t].address_of(__mutex)
+    )
+
+
+fn pthread_cond_wait(
+    inout __cond: pthread_cond_t, inout __mutex: pthread_mutex_t
+) -> Int32:
+    return external_call[
+        "pthread_cond_wait", Int32, Pointer[pthread_mutex_t], Pointer[pthread_cond_t]
+    ](
+        Pointer[pthread_mutex_t].address_of(__mutex),
+        Pointer[pthread_cond_t].address_of(__cond),
+    )
+
+
+fn pthread_cond_signal(inout __cond: pthread_cond_t) -> Int32:
+    return external_call["pthread_cond_signal", Int32, Pointer[pthread_cond_t]](
+        Pointer[pthread_cond_t].address_of(__cond),
+    )
+
+
+fn pthread_create(
+    inout __newthread: pthread_t, inout __start_routine: fn (UInt8) -> UInt8
+) -> Int32:
+    """Create a new thread without attr and arg."""
+    return external_call[
+        "pthread_create",
+        Int32,
+        Pointer[pthread_t],
+        UInt8,
+        Pointer[fn (UInt8) -> UInt8],
+        UInt8,
+    ](
+        Pointer[pthread_t].address_of(__newthread),
+        0,
+        Pointer[fn (UInt8) -> UInt8].address_of(__start_routine),
+        0,
+    )
