@@ -3,7 +3,6 @@ import time
 from algorithm import parallelize, num_cores
 from memory import memcpy, memset_zero
 from python import Python, Dictionary
-# from runtime.llcl import Runtime
 
 alias __version__ = "0.0.1"
 alias __version_tag__ = "pre-alpha"

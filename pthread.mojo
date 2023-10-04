@@ -167,7 +167,8 @@ fn pthread_cond_signal(inout __cond: pthread_cond_t) -> Int32:
 
 
 fn pthread_create(
-    inout __newthread: pthread_t, inout __start_routine: fn (UInt8) -> UInt8
+    inout __newthread: pthread_t,
+    inout __start_routine: fn (Pointer[UInt8]) -> Pointer[UInt8],
 ) -> Int32:
     """Create a new thread without attr and arg."""
     return external_call[
@@ -175,11 +176,11 @@ fn pthread_create(
         Int32,
         Pointer[pthread_t],
         UInt8,
-        Pointer[fn (UInt8) -> UInt8],
+        Pointer[fn (Pointer[UInt8]) -> Pointer[UInt8]],
         UInt8,
     ](
         Pointer[pthread_t].address_of(__newthread),
         0,
-        Pointer[fn (UInt8) -> UInt8].address_of(__start_routine),
+        Pointer[fn (Pointer[UInt8]) -> Pointer[UInt8]].address_of(__start_routine),
         0,
     )
