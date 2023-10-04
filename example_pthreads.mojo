@@ -13,6 +13,12 @@ var task_cond: pthread_cond_t = pthread_cond_t()
 fn worker_thread_func(arg: UInt8) -> UInt8:
     print("Worker thread started")
 
+    sleep(10)
+
+    print("Worker thread finished")
+
+    queue_size -= 1
+
     return 0
 
 
@@ -32,7 +38,8 @@ fn main():
 
         if queue_size == THREAD_POOL_SIZE:
             print("Queue full")
-            _ = pthread_mutex_unlock(queue_mutex)
+            let val = pthread_mutex_unlock(queue_mutex)
+            print("val:", val)
             sleep(1)
             continue
 

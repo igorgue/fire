@@ -10,14 +10,6 @@ alias PTHREAD_MUTEX_ADAPTIVE_NP = 3
 
 alias pthread_t = UInt64
 
-# var task_queue: StaticTuple[THREAD_POOL_SIZE, Int32] = StaticTuple[
-#     THREAD_POOL_SIZE, Int32
-# ](0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-# var queue_size: Int32 = 0
-#
-# var queue_mutex: pthread_mutex_t = pthread_mutex_t(PTHREAD_MUTEX_TIMED_NP)
-# var task_cond: pthread_cond_t = pthread_cond_t()
-
 
 @value
 @register_passable("trivial")
