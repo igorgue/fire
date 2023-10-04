@@ -1,6 +1,9 @@
 import time
-from python import Python, Dictionary
+
+from algorithm import parallelize, num_cores
 from memory import memcpy, memset_zero
+from python import Python, Dictionary
+# from runtime.llcl import Runtime
 
 alias __version__ = "0.0.1"
 alias __version_tag__ = "pre-alpha"
@@ -14,9 +17,9 @@ alias SO_REUSEPORT = 15
 alias INADDR_ANY = 0x00000000
 
 alias ROUTES_CAPACITY = 256
-
 alias REQUEST_BUFFER_SIZE = 30000
 alias RESPONSE_BUFFER_SIZE = 30000
+alias WORKERS_PER_CORE = 10
 alias HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]
 alias HOST = "0.0.0.0"
 alias PORT = 8000
@@ -417,6 +420,95 @@ fn load_python_modules():
         exit(-1)
 
 
+fn respond_to_client(
+    client_socketfd: Int32,
+    req: Request,
+    handler: fn (Request) -> Response,
+):
+    let res = handler(req).to_string()
+
+    _ = write(client_socketfd, res, len(res))
+
+
+fn workers() -> Int:
+    return num_cores() * WORKERS_PER_CORE
+
+
+fn wait_for_clients(
+    socketfd: Int32,
+    inout address_sock: sockaddr,
+):
+    while True:
+        let client_socketfd: Int32
+        let not_found = http_404().to_string()
+        let not_found_len = len(not_found)
+        var start: Int = 0
+        var bytes_received: Int32 = 0
+        var sin_size = UInt32(sizeof[UInt32]())
+
+        let buf = Pointer[UInt8].alloc(REQUEST_BUFFER_SIZE)
+        client_socketfd = accept(socketfd, address_sock, sin_size)
+
+        if client_socketfd < 0:
+            print("accept")
+            return
+
+        if DEBUG:
+            start = time.now()
+
+        bytes_received = read(client_socketfd, buf, REQUEST_BUFFER_SIZE)
+
+        let method = app.get_method(buf, REQUEST_BUFFER_SIZE)
+        let path = app.get_path(buf, REQUEST_BUFFER_SIZE)
+        let protocol_version = app.get_protocol_version(
+            buf, REQUEST_BUFFER_SIZE
+        )
+
+        let handler: fn (Request) -> Response
+        try:
+            handler = find_handler(path)
+        except e:
+            _ = write(client_socketfd, not_found, not_found_len)
+            _ = close(client_socketfd)
+
+            print("> error:", e.value)
+
+            continue
+
+        let params_data = app.get_params(
+            buf, REQUEST_BUFFER_SIZE, find_pattern(path)
+        )
+
+        var req = Request(
+            to_string_ref(path),
+            to_string_ref(method),
+            to_string_ref(protocol_version),
+        )
+        req._params = params_data
+        req.PARAMS = req.get_params_dict()
+
+        respond_to_client(client_socketfd, req, handler)
+
+        if DEBUG:
+            var log = "[" + method + "] " + path
+
+            let total = (time.now() - start) // 1000
+            if total > 1000:
+                log += (
+                    " "
+                    + String(total // 1000)
+                    + " ms "
+                    + bytes_received
+                    + " bytes"
+                )
+            else:
+                log += " " + String(total) + " µs " + bytes_received + " bytes"
+
+            print(log)
+
+                _ = close(client_socketfd)
+
+
 @value
 @register_passable("trivial")
 struct Application:
@@ -430,7 +522,6 @@ struct Application:
         load_python_modules()
 
         let socketfd: Int32
-        let client_socketfd: Int32
 
         var address = sockaddr_in()
         var opt: UInt8 = SO_REUSEADDR
@@ -466,73 +557,14 @@ struct Application:
             return
 
         print(
-            "🔥 started on http://localhost:" + String(app.port) + " (CTRL + C to quit)"
+            "🔥 started on http://localhost:"
+            + String(app.port)
+            + ", workers: "
+            + String(workers())
+            + " (CTRL + C to quit)"
         )
 
-        let not_found = Response.http_404().to_string()
-        let not_found_len = len(not_found)
-        var start: Int = 0
-        var bytes_received: Int32 = 0
-
-        while True:
-            let buf = Pointer[UInt8].alloc(REQUEST_BUFFER_SIZE)
-            var sin_size = UInt32(sizeof[UInt32]())
-            client_socketfd = accept(socketfd, address_sock, sin_size)
-
-            if client_socketfd < 0:
-                print("accept")
-                return
-
-            if DEBUG:
-                start = time.now()
-
-            bytes_received = read(client_socketfd, buf, REQUEST_BUFFER_SIZE)
-
-            let method = self.get_method(buf, REQUEST_BUFFER_SIZE)
-            let path = self.get_path(buf, REQUEST_BUFFER_SIZE)
-            let protocol_version = self.get_protocol_version(buf, REQUEST_BUFFER_SIZE)
-
-            let handler: fn (Request) -> Response
-            try:
-                handler = find_handler(path)
-            except e:
-                _ = write(client_socketfd, not_found, not_found_len)
-                _ = close(client_socketfd)
-
-                print("> error:", e.value)
-
-                continue
-
-            let params_data = self.get_params(
-                buf, REQUEST_BUFFER_SIZE, find_pattern(path)
-            )
-
-            var req = Request(
-                to_string_ref(path),
-                to_string_ref(method),
-                to_string_ref(protocol_version),
-            )
-            req._params = params_data
-            req.PARAMS = req.get_params_dict()
-
-            let res = handler(req).to_string()
-
-            _ = write(client_socketfd, res, len(res))
-
-            if DEBUG:
-                var log = "[" + method + "] " + path
-
-                let total = (time.now() - start) // 1000
-                if total > 1000:
-                    log += (
-                        " " + String(total // 1000) + " ms " + bytes_received + " bytes"
-                    )
-                else:
-                    log += " " + String(total) + " µs " + bytes_received + " bytes"
-
-                print(log)
-
-            _ = close(client_socketfd)
+        wait_for_clients(socketfd, address_sock)
 
     @always_inline
     fn get_method(self, buf: Pointer[UInt8], buflen: Int) -> String:

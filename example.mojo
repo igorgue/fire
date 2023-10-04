@@ -1,4 +1,5 @@
 import time
+
 from fire import (
     app,
     json,
@@ -13,7 +14,6 @@ fn index(request: Request) -> Response:
 
 
 fn get_post(request: Request) -> Response:
-    time.sleep(10)
     return json(request.PARAMS)
 
 
