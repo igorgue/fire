@@ -10,13 +10,13 @@ alias PTHREAD_MUTEX_ADAPTIVE_NP = 3
 
 alias pthread_t = UInt64
 
-var task_queue: StaticTuple[THREAD_POOL_SIZE, Int32] = StaticTuple[
-    THREAD_POOL_SIZE, Int32
-](0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-var queue_size: Int32 = 0
-
-var queue_mutex: pthread_mutex_t = pthread_mutex_t(PTHREAD_MUTEX_TIMED_NP)
-var task_cond: pthread_cond_t = pthread_cond_t()
+# var task_queue: StaticTuple[THREAD_POOL_SIZE, Int32] = StaticTuple[
+#     THREAD_POOL_SIZE, Int32
+# ](0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+# var queue_size: Int32 = 0
+#
+# var queue_mutex: pthread_mutex_t = pthread_mutex_t(PTHREAD_MUTEX_TIMED_NP)
+# var task_cond: pthread_cond_t = pthread_cond_t()
 
 
 @value
@@ -168,7 +168,7 @@ fn pthread_cond_signal(inout __cond: pthread_cond_t) -> Int32:
 
 fn pthread_create(
     inout __newthread: pthread_t,
-    inout __start_routine: fn (Pointer[UInt8]) -> Pointer[UInt8],
+    __start_routine: fn (UInt8) -> UInt8,
 ) -> Int32:
     """Create a new thread without attr and arg."""
     return external_call[
@@ -176,11 +176,11 @@ fn pthread_create(
         Int32,
         Pointer[pthread_t],
         UInt8,
-        Pointer[fn (Pointer[UInt8]) -> Pointer[UInt8]],
+        fn (UInt8) -> UInt8,
         UInt8,
     ](
         Pointer[pthread_t].address_of(__newthread),
         0,
-        Pointer[fn (Pointer[UInt8]) -> Pointer[UInt8]].address_of(__start_routine),
+        __start_routine,
         0,
     )
