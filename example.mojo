@@ -1,12 +1,6 @@
 import time
 
-from fire import (
-    app,
-    json,
-    r,
-    Request,
-    Response,
-)
+from fire import app, json, r, Request, Response
 
 
 fn index(request: Request) -> Response:

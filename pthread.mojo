@@ -54,6 +54,7 @@ struct pthread_mutex_t:
 @register_passable("trivial")
 struct __pthread_list_t:
     # FIXME: __prev and __next should be a pointers to __pthread_list_t
+    # but now a void pointer would do which is a Pointer[UInt8]
     var __prev: Pointer[UInt8]
     var __next: Pointer[UInt8]
 
@@ -158,7 +159,7 @@ fn pthread_cond_signal(inout __cond: pthread_cond_t) -> Int32:
 
 fn pthread_create(
     inout __newthread: pthread_t,
-    __start_routine: fn (UInt8) -> UInt8,
+    __start_routine: fn (UInt8) capturing -> UInt8,
 ) -> Int32:
     """Create a new thread without attr and arg."""
     return external_call[
@@ -166,7 +167,7 @@ fn pthread_create(
         Int32,
         Pointer[pthread_t],
         UInt8,
-        fn (UInt8) -> UInt8,
+        fn (UInt8) capturing -> UInt8,
         UInt8,
     ](
         Pointer[pthread_t].address_of(__newthread),

@@ -10,19 +10,20 @@ var queue_mutex: pthread_mutex_t = pthread_mutex_t(PTHREAD_MUTEX_TIMED_NP)
 var task_cond: pthread_cond_t = pthread_cond_t()
 
 
-fn worker_thread_func(arg: UInt8) -> UInt8:
-    print("Worker thread started")
-
-    sleep(10)
-
-    print("Worker thread finished")
-
-    queue_size -= 1
-
-    return 0
-
-
 fn main():
+    fn worker_thread_func(arg: UInt8) -> UInt8:
+        print("Worker thread started")
+
+        sleep(10)
+
+        print("Worker thread finished")
+
+        queue_size -= 1
+
+        print("queue_size:", queue_size)
+
+        return 0
+
     var workers = StaticTuple[THREAD_POOL_SIZE, pthread_t]()
 
     for i in range(THREAD_POOL_SIZE):

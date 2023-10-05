@@ -28,7 +28,7 @@ var app = Application()
 var routes = Routes()
 
 var py_json: PythonObject = None
-var py_dict = Python.dict
+alias py_dict = Python.dict
 
 alias r = route
 
@@ -459,9 +459,7 @@ fn wait_for_clients(
 
         let method = app.get_method(buf, REQUEST_BUFFER_SIZE)
         let path = app.get_path(buf, REQUEST_BUFFER_SIZE)
-        let protocol_version = app.get_protocol_version(
-            buf, REQUEST_BUFFER_SIZE
-        )
+        let protocol_version = app.get_protocol_version(buf, REQUEST_BUFFER_SIZE)
 
         let handler: fn (Request) -> Response
         try:
@@ -474,9 +472,7 @@ fn wait_for_clients(
 
             continue
 
-        let params_data = app.get_params(
-            buf, REQUEST_BUFFER_SIZE, find_pattern(path)
-        )
+        let params_data = app.get_params(buf, REQUEST_BUFFER_SIZE, find_pattern(path))
 
         var req = Request(
             to_string_ref(path),
@@ -493,19 +489,13 @@ fn wait_for_clients(
 
             let total = (time.now() - start) // 1000
             if total > 1000:
-                log += (
-                    " "
-                    + String(total // 1000)
-                    + " ms "
-                    + bytes_received
-                    + " bytes"
-                )
+                log += " " + String(total // 1000) + " ms " + bytes_received + " bytes"
             else:
                 log += " " + String(total) + " µs " + bytes_received + " bytes"
 
             print(log)
 
-                _ = close(client_socketfd)
+        _ = close(client_socketfd)
 
 
 @value
