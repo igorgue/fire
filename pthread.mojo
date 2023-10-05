@@ -175,3 +175,17 @@ fn pthread_create(
         __start_routine,
         0,
     )
+
+
+fn pthread_join(__th: pthread_t, inout __thread_return: UInt8) -> Int32:
+    return external_call["pthread_join", Int32, pthread_t, Pointer[UInt8]](
+        __th,
+        Pointer[UInt8].address_of(__thread_return),
+    )
+
+
+fn pthread_join(__th: pthread_t) -> Int32:
+    return external_call["pthread_join", Int32, pthread_t, Pointer[UInt8]](
+        __th,
+        Pointer[UInt8].get_null(),
+    )
