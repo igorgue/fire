@@ -189,3 +189,7 @@ fn pthread_join(__th: pthread_t) -> Int32:
         __th,
         Pointer[UInt8].get_null(),
     )
+
+
+fn pthread_exit(__retval: UInt8) -> UInt8:
+    return external_call["pthread_exit", UInt8, UInt8](__retval)
