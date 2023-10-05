@@ -182,7 +182,7 @@ struct Response:
 
             resp.content = to_string_ref(content.to_string())
         except e:
-            print("> error:", e.value)
+            print("> error:", e)
             resp.content = to_string_ref("{}")
 
         return resp
@@ -198,7 +198,7 @@ struct Response:
 
             resp.content = to_string_ref(content.to_string())
         except e:
-            print("> error:", e.value)
+            print("> error:", e)
             resp.content = to_string_ref("[]")
 
         return resp
@@ -295,7 +295,7 @@ struct Request:
                 res[self._params[i]] = self._params[i + 1]
                 i += 2
         except e:
-            print_no_newline("> error:", e.value)
+            print_no_newline("> error:", e)
             print("returning empty dict")
 
         return res
@@ -309,7 +309,7 @@ struct Request:
                 res[self._params[i]] = self._params[i + 1]
                 i += 2
         except e:
-            print_no_newline("> error:", e.value)
+            print_no_newline("> error:", e)
             print("returning empty dict")
 
         return res
@@ -323,7 +323,7 @@ struct Request:
                 res[self._params[i]] = self._params[i + 1]
                 i += 2
         except e:
-            print_no_newline("> error:", e.value)
+            print_no_newline("> error:", e)
             print("returning empty dict")
 
         return res
@@ -415,7 +415,7 @@ fn load_python_modules():
     try:
         py_json = Python.import_module("json")
     except e:
-        print("> error loading python module:", e.value)
+        print("> error loading python module:", e)
         exit(-1)
 
 
@@ -468,7 +468,7 @@ fn wait_for_clients(
             _ = write(client_socketfd, not_found, not_found_len)
             _ = close(client_socketfd)
 
-            print("> error:", e.value)
+            print("> error:", e)
 
             continue
 
