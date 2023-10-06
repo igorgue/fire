@@ -3,6 +3,7 @@ import time
 from algorithm import parallelize, num_cores
 from memory import memcpy, memset_zero
 from python import Python, Dictionary
+from pthread import *
 
 alias __version__ = "0.0.1"
 alias __version_tag__ = "pre-alpha"
@@ -213,25 +214,26 @@ struct Response:
 
         return resp
 
-    fn to_string(self) -> String:
-        return (
-            "HTTP/1.1 "
-            + String(self.status)
-            + " "
-            + self.status_text
-            + "\nContent-Type: "
-            + self.content_type
-            + "\nServer: "
-            + __server__
-            + "/"
-            + __version__
-            + " ("
-            + __version_tag__
-            + ")\nContent-Length: "
-            + String(len(self.content))
-            + "\n\n"
-            + self.content
-        )
+    fn to_string(self: Self) -> String:
+        return ""
+        # return (
+        #     "HTTP/1.1 "
+        #     + String(self.status)
+        #     + " "
+        #     + self.status_text
+        #     + "\nContent-Type: "
+        #     + self.content_type
+        #     + "\nServer: "
+        #     + __server__
+        #     + "/"
+        #     + __version__
+        #     + " ("
+        #     + __version_tag__
+        #     + ")\nContent-Length: "
+        #     + String(len(self.content))
+        #     + "\n\n"
+        #     + self.content
+        # )
 
 
 fn http_404() -> Response:
@@ -424,9 +426,21 @@ fn respond_to_client(
     req: Request,
     handler: fn (Request) -> Response,
 ):
-    let res = handler(req).to_string()
+    var th = pthread_t()
 
-    _ = write(client_socketfd, res, len(res))
+    fn handler_th(arg: Int) -> UInt8:
+        let res = handler(req).to_string()
+
+        _ = write(client_socketfd, res, len(res))
+
+        return pthread_exit(0)
+
+    if pthread_create(th, handler_th) != 0:
+        print("pthread_create, error, retrying")
+
+        respond_to_client(client_socketfd, req, handler)
+
+    _ = pthread_detach(th)
 
 
 fn workers() -> Int:
@@ -507,8 +521,11 @@ struct Application:
     fn __init__() -> Self:
         return Self {host: HOST, port: PORT}
 
-    fn run(self):
+    fn run(inout self):
         load_python_modules()
+
+        self.host = "localhost"
+        self.port = 8000
 
         let socketfd: Int32
 
@@ -531,8 +548,9 @@ struct Application:
             return
 
         address.sin_family = AF_INET
-        address.sin_addr.s_addr = INADDR_ANY  # TODO: use app.host
-        address.sin_port = htons(app.port)
+        address.sin_addr.s_addr = INADDR_ANY  # TODO: use self.host
+
+        address.sin_port = htons(self.port)
 
         var address_sock = Pointer[sockaddr_in].address_of(address).bitcast[
             sockaddr
@@ -547,7 +565,7 @@ struct Application:
 
         print(
             "🔥 started on http://localhost:"
-            + String(app.port)
+            + String(self.port)
             + ", workers: "
             + String(workers())
             + " (CTRL + C to quit)"

@@ -2,6 +2,7 @@ from memory import memset_zero
 
 alias THREAD_POOL_SIZE = 10
 alias __SIZEOF_PTHREAD_MUTEX_T = 40  # value for x86_64
+alias __SIZEOF_PTHREAD_ATTR_T = 56  # value for x86_64
 
 alias PTHREAD_MUTEX_TIMED_NP = 0
 alias PTHREAD_MUTEX_RECURSIVE_NP = 1
@@ -43,9 +44,7 @@ struct pthread_mutex_t:
                 0,
                 __pthread_list_t(),
             ),
-            __size: StaticTuple[__SIZEOF_PTHREAD_MUTEX_T, Int8](
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ),
+            __size: StaticTuple[__SIZEOF_PTHREAD_MUTEX_T, Int8](0),
             __align: 0,
         }
 
@@ -95,9 +94,7 @@ struct pthread_cond_t:
                 0,
                 StaticTuple[2, UInt32](0, 0),
             ),
-            __size: StaticTuple[__SIZEOF_PTHREAD_MUTEX_T, Int8](
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ),
+            __size: StaticTuple[__SIZEOF_PTHREAD_MUTEX_T, Int8](0),
             __align: 0,
         }
 
@@ -126,6 +123,19 @@ struct __atomic_wide_counter:
 struct __value32:
     var __low: UInt32
     var __high: UInt32
+
+
+@value
+@register_passable("trivial")
+struct pthread_attr_t:
+    var __size: StaticTuple[__SIZEOF_PTHREAD_ATTR_T, UInt8]
+    var __align: Int64
+
+    fn __init__() -> Self:
+        return Self {
+            __size: StaticTuple[__SIZEOF_PTHREAD_ATTR_T, UInt8](0),
+            __align: 0,
+        }
 
 
 fn pthread_mutex_lock(inout __mutex: pthread_mutex_t) -> Int32:
@@ -157,23 +167,126 @@ fn pthread_cond_signal(inout __cond: pthread_cond_t) -> Int32:
     )
 
 
+fn pthread_attr_init(inout __attr: pthread_attr_t) -> Int32:
+    return external_call["pthread_attr_init", Int32, Pointer[pthread_attr_t]](
+        Pointer[pthread_attr_t].address_of(__attr),
+    )
+
+
+fn pthread_attr_getdetachstate(
+    inout __attr: pthread_attr_t, inout __detachstate: Int32
+) -> Int32:
+    return external_call[
+        "pthread_attr_init", Int32, Pointer[pthread_attr_t], Pointer[Int32]
+    ](
+        Pointer[pthread_attr_t].address_of(__attr),
+        Pointer[Int32].address_of(__detachstate),
+    )
+
+
+fn pthread_attr_setdetachstate(
+    inout __attr: pthread_attr_t, __detachstate: Int32
+) -> Int32:
+    return external_call["pthread_attr_init", Int32, Pointer[pthread_attr_t], Int32](
+        Pointer[pthread_attr_t].address_of(__attr), __detachstate
+    )
+
+
+# FIXME: no workee
+# fn pthread_create[
+#     T: AnyType
+# ]( inout __newthread: pthread_t,
+#     __start_routine: fn (T) capturing -> UInt8,
+#     __arg: T,
+# ) -> Int32:
+#     """Create a new thread without attr and arg."""
+#     return external_call[
+#         "pthread_create",
+#         Int32,
+#         Pointer[pthread_t],
+#         UInt8,
+#         fn (T) capturing -> UInt8,
+#         T,
+#     ](
+#         Pointer[pthread_t].address_of(__newthread),
+#         0,
+#         __start_routine,
+#         __arg,
+#     )
+#
 fn pthread_create(
     inout __newthread: pthread_t,
-    __start_routine: fn (UInt8) capturing -> UInt8,
+    __start_routine: fn (Int) capturing -> UInt8,
 ) -> Int32:
     """Create a new thread without attr and arg."""
     return external_call[
         "pthread_create",
         Int32,
         Pointer[pthread_t],
-        UInt8,
-        fn (UInt8) capturing -> UInt8,
-        UInt8,
+        Pointer[UInt8],
+        fn (Int) capturing -> UInt8,
+        Pointer[UInt8],
     ](
         Pointer[pthread_t].address_of(__newthread),
-        0,
+        Pointer[UInt8].get_null(),
         __start_routine,
-        0,
+        Pointer[UInt8].get_null(),
+    )
+
+
+fn pthread_create(
+    inout __newthread: pthread_t,
+    __start_routine: fn (Int) capturing -> UInt8,
+    inout __arg: Int,
+) -> Int32:
+    """Create a new thread without attr and arg."""
+    return external_call[
+        "pthread_create",
+        Int32,
+        Pointer[pthread_t],
+        Pointer[UInt8],
+        fn (Int) capturing -> UInt8,
+        Pointer[UInt8],
+    ](
+        Pointer[pthread_t].address_of(__newthread),
+        Pointer[UInt8].get_null(),
+        __start_routine,
+        Pointer[Int].address_of(__arg).bitcast[UInt8](),
+    )
+
+
+fn pthread_create(
+    inout __newthread: pthread_t,
+    inout __attr: pthread_attr_t,
+    __start_routine: fn (Pointer[Int]) capturing -> UInt8,
+) -> Int32:
+    """Create a new thread without attr and arg."""
+    return external_call[
+        "pthread_create",
+        Int32,
+        Pointer[pthread_t],
+        Pointer[pthread_attr_t],
+        fn (Pointer[Int]) capturing -> UInt8,
+    ](
+        Pointer[pthread_t].address_of(__newthread),
+        Pointer[pthread_attr_t].address_of(__attr),
+        __start_routine,
+    )
+
+
+fn pthread_create(
+    inout __newthread: pthread_t,
+    __start_routine: fn () capturing -> UInt8,
+) -> Int32:
+    """Create a new thread without attr and arg."""
+    return external_call[
+        "pthread_create",
+        Int32,
+        Pointer[pthread_t],
+        fn () capturing -> UInt8,
+    ](
+        Pointer[pthread_t].address_of(__newthread),
+        __start_routine,
     )
 
 
@@ -191,5 +304,14 @@ fn pthread_join(__th: pthread_t) -> Int32:
     )
 
 
-fn pthread_exit(__retval: UInt8) -> UInt8:
-    return external_call["pthread_exit", UInt8, UInt8](__retval)
+fn pthread_exit(__retval: String) -> UInt8:
+    let slen = len(__retval)
+    let ptr = Pointer[UInt8]().alloc(slen)
+
+    memcpy(ptr, __retval._buffer.data.bitcast[UInt8](), slen)
+
+    return external_call["pthread_exit", UInt8, Pointer[UInt8]](ptr)
+
+
+fn pthread_detach(__th: pthread_t) -> Int32:
+    return external_call["pthread_detach", Int32, pthread_t](__th)
