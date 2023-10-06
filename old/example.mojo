@@ -7,12 +7,12 @@ fn index(request: Request) -> Response:
     return Response("hello world")
 
 
-fn get_post(request: Request) -> Response:
-    return json(request.PARAMS)
+# fn get_post(request: Request) -> Response:
+#     return json(request.PARAMS)
 
 
 fn main():
     r["/"](index)
-    r["/posts/{id}"](get_post)
+    # r["/posts/{id}"](get_post)
 
     app.run()

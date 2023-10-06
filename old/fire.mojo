@@ -214,8 +214,11 @@ struct Response:
 
         return resp
 
-    fn to_string(self: Self) -> String:
-        return ""
+    @always_inline
+    fn to_s(self: Self) -> String:
+        let hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nServer: Fire🔥/0.0.1 (pre-alpha)\nContent-Length: 12\n\nHello, World!"
+
+        return hello
         # return (
         #     "HTTP/1.1 "
         #     + String(self.status)
@@ -266,9 +269,9 @@ struct Request:
     var _data: StringRef
     var _params: DynamicVector[StringRef]
 
-    var PARAMS: Dictionary
-    var QS: Dictionary
-    var DATA: Dictionary
+    # var PARAMS: Dictionary
+    # var QS: Dictionary
+    # var DATA: Dictionary
 
     fn __init__(
         inout self,
@@ -284,9 +287,9 @@ struct Request:
         self._data = ""
         self._params = DynamicVector[StringRef]()
 
-        self.PARAMS = py_dict()
-        self.QS = py_dict()
-        self.DATA = py_dict()
+        # self.PARAMS = py_dict()
+        # self.QS = py_dict()
+        # self.DATA = py_dict()
 
     fn get_params_dict(self) -> Dictionary:
         let res = py_dict()
@@ -421,26 +424,36 @@ fn load_python_modules():
         exit(-1)
 
 
+@always_inline
 fn respond_to_client(
     client_socketfd: Int32,
     req: Request,
     handler: fn (Request) -> Response,
 ):
-    var th = pthread_t()
+    # var th = pthread_t()
+    #
+    # fn handler_th(arg: Int) -> UInt8:
+    #     print("thread started")
+    #     let res = handler(req).to_s()
+    #
+    #     print(res)
+    #
+    #     _ = write(client_socketfd, res, len(res))
+    #     _ = close(client_socketfd)
+    #
+    #     return pthread_exit(0)
+    #
+    # if pthread_create(th, handler_th) != 0:
+    #     print("pthread_create, error, retrying")
+    #
+    #     respond_to_client(client_socketfd, req, handler)
+    #
+    # _ = pthread_detach(th)
 
-    fn handler_th(arg: Int) -> UInt8:
-        let res = handler(req).to_string()
+    let res = handler(req).to_s()
 
-        _ = write(client_socketfd, res, len(res))
-
-        return pthread_exit(0)
-
-    if pthread_create(th, handler_th) != 0:
-        print("pthread_create, error, retrying")
-
-        respond_to_client(client_socketfd, req, handler)
-
-    _ = pthread_detach(th)
+    _ = write(client_socketfd, res, len(res))
+    _ = close(client_socketfd)
 
 
 fn workers() -> Int:
@@ -453,7 +466,7 @@ fn wait_for_clients(
 ):
     while True:
         let client_socketfd: Int32
-        let not_found = http_404().to_string()
+        let not_found = http_404().to_s()
         let not_found_len = len(not_found)
         var start: Int = 0
         var bytes_received: Int32 = 0
@@ -486,15 +499,15 @@ fn wait_for_clients(
 
             continue
 
-        let params_data = app.get_params(buf, REQUEST_BUFFER_SIZE, find_pattern(path))
+        # let params_data = app.get_params(buf, REQUEST_BUFFER_SIZE, find_pattern(path))
 
         var req = Request(
             to_string_ref(path),
             to_string_ref(method),
             to_string_ref(protocol_version),
         )
-        req._params = params_data
-        req.PARAMS = req.get_params_dict()
+        # req._params = params_data
+        # req.PARAMS = req.get_params_dict()
 
         respond_to_client(client_socketfd, req, handler)
 
@@ -508,8 +521,6 @@ fn wait_for_clients(
                 log += " " + String(total) + " µs " + bytes_received + " bytes"
 
             print(log)
-
-        _ = close(client_socketfd)
 
 
 @value
@@ -648,57 +659,56 @@ struct Application:
 
         return String(ptr.bitcast[Int8](), j - i)
 
-    @always_inline
     fn get_params(
         self, buf: Pointer[UInt8], buflen: Int, pattern: StringRef
     ) -> DynamicVector[StringRef]:
-        let pattern_string = String(pattern)
+        # let pattern_string = String(pattern)
         var res = DynamicVector[StringRef]()
-        let path = self.get_path(buf, buflen)
+        # let path = self.get_path(buf, buflen)
 
-        var i = 0
-        var j = 0
-        while i < len(path):
-            if (
-                path[i] == " "
-                or path[i] == "?"
-                or ord(path[i]) < 31
-                or ord(path[i]) > 128
-            ):
-                break
-
-            if pattern[j] == "{":
-                let name_start = j + 1
-
-                while pattern[j] != "}":
-                    j += 1
-
-                let name_end = j
-                let name = pattern_string[name_start:name_end]
-
-                res.push_back(to_string_ref(name))
-
-                let value_start = i
-                while (
-                    path[i] != "/"
-                    and path[i] != " "
-                    and ord(path[i]) > 31
-                    and ord(path[i]) < 128
-                ):
-                    i += 1
-                let value_end = i
-                let value = path[value_start:value_end]
-                res.push_back(to_string_ref(value))
-
-            if (
-                path[i] == " "
-                or path[i] == "?"
-                or ord(path[i]) < 31
-                or ord(path[i]) > 128
-            ):
-                break
-
-            i += 1
-            j += 1
+        # var i = 0
+        # var j = 0
+        # while i < len(path):
+        #     if (
+        #         path[i] == " "
+        #         or path[i] == "?"
+        #         or ord(path[i]) < 31
+        #         or ord(path[i]) > 128
+        #     ):
+        #         break
+        #
+        #     if pattern[j] == "{":
+        #         let name_start = j + 1
+        #
+        #         while pattern[j] != "}":
+        #             j += 1
+        #
+        #         let name_end = j
+        #         let name = pattern_string[name_start:name_end]
+        #
+        #         res.push_back(to_string_ref(name))
+        #
+        #         let value_start = i
+        #         while (
+        #             path[i] != "/"
+        #             and path[i] != " "
+        #             and ord(path[i]) > 31
+        #             and ord(path[i]) < 128
+        #         ):
+        #             i += 1
+        #         let value_end = i
+        #         let value = path[value_start:value_end]
+        #         res.push_back(to_string_ref(value))
+        #
+        #     if (
+        #         path[i] == " "
+        #         or path[i] == "?"
+        #         or ord(path[i]) < 31
+        #         or ord(path[i]) > 128
+        #     ):
+        #         break
+        #
+        #     i += 1
+        #     j += 1
 
         return res
