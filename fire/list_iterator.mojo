@@ -1,4 +1,4 @@
-struct ListIterator[T: AnyType]:
+struct ListIterator[T: AnyRegType]:
     """
     To use in a for loop, you need to implement `__iter__`.
     """

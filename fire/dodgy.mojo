@@ -3,7 +3,7 @@ from memory import memcpy, memset_zero
 
 @value
 @register_passable("trivial")
-struct DodgyString:
+struct DodgyString(CollectionElement):
     """
     A string that is dodgy because it is not null-terminated.
     """

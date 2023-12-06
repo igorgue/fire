@@ -2,7 +2,9 @@ import time
 
 from algorithm import parallelize, num_cores
 from memory import memcpy, memset_zero
+from memory.unsafe import bitcast
 from python import Python, Dictionary
+from utils.vector import InlinedFixedVector, DynamicVector
 
 from .dodgy import DodgyString
 
@@ -105,7 +107,8 @@ fn write(fildes: Int32, s: String, nbyte: Int) -> Int32:
     let slen = len(s)
     let ptr = Pointer[UInt8]().alloc(slen)
 
-    memcpy(ptr, s._buffer.data.bitcast[UInt8](), slen)
+    # memcpy(ptr, bitcast[UInt8](s._as_ptr().load().to_int()), slen)
+    memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
 
     return external_call["write", Int, Int32, Pointer[UInt8], Int](fildes, ptr, nbyte)
 
@@ -115,11 +118,12 @@ fn close(fildes: Int32) -> Int32:
 
 
 fn perror(s: String):
-    let ptr = Pointer[Int8]().alloc(len(s))
+    let slen = len(s)
+    let ptr = Pointer[UInt8]().alloc(len(s))
 
-    memcpy(ptr, s._buffer.data.bitcast[Int8](), len(s))
+    memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
 
-    _ = external_call["perror", UInt8, Pointer[Int8]](ptr)
+    _ = external_call["perror", UInt8, Pointer[UInt8]](ptr)
 
 
 fn exit(status: Int32):
@@ -179,7 +183,7 @@ struct Response:
             var py_json = Python.import_module("json")
             let content = py_json.dumps(data.py_object)
 
-            resp.content = to_string_ref(content.to_string())
+            resp.content = to_string_ref(str(content))
         except e:
             print("> error:", e)
             resp.content = to_string_ref("{}")
@@ -196,7 +200,7 @@ struct Response:
             var py_json = Python.import_module("json")
             let content = py_json.dumps(data)
 
-            resp.content = to_string_ref(content.to_string())
+            resp.content = to_string_ref(str(content))
         except e:
             print("> error:", e)
             resp.content = to_string_ref("[]")
@@ -330,23 +334,23 @@ struct Request:
 
 
 struct Routes:
-    var paths: InlinedFixedVector[ROUTES_CAPACITY, StringRef]
-    var handlers: InlinedFixedVector[ROUTES_CAPACITY, fn (req: Request) -> Response]
+    var paths: InlinedFixedVector[StringRef, ROUTES_CAPACITY]
+    var handlers: InlinedFixedVector[fn (req: Request) -> Response, ROUTES_CAPACITY]
     var size: Int
 
     fn __init__(inout self: Self):
         self.size = 0
-        self.paths = InlinedFixedVector[ROUTES_CAPACITY, StringRef](ROUTES_CAPACITY)
+        self.paths = InlinedFixedVector[StringRef, ROUTES_CAPACITY](ROUTES_CAPACITY)
         self.handlers = InlinedFixedVector[
-            ROUTES_CAPACITY, fn (req: Request) -> Response
+            fn (req: Request) -> Response, ROUTES_CAPACITY
         ](ROUTES_CAPACITY)
 
 
 fn to_string_ref(s: String) -> StringRef:
     let slen = len(s)
-    let ptr = Pointer[Int8]().alloc(slen + 1)
+    let ptr = Pointer[UInt8]().alloc(slen + 1)
 
-    memcpy(ptr, s._buffer.data.bitcast[Int8](), slen)
+    memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
     memset_zero(ptr.offset(slen), 1)
 
     return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen)
