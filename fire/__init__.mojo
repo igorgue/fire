@@ -180,7 +180,7 @@ struct Response:
         resp.content_type = "application/json"
 
         try:
-            var py_json = Python.import_module("json")
+            let py_json = Python.import_module("json")
             let content = py_json.dumps(data.py_object)
 
             resp.content = to_string_ref(str(content))
@@ -197,7 +197,7 @@ struct Response:
         resp.content_type = "application/json"
 
         try:
-            var py_json = Python.import_module("json")
+            let py_json = Python.import_module("json")
             let content = py_json.dumps(data)
 
             resp.content = to_string_ref(str(content))
@@ -347,13 +347,14 @@ struct Routes:
 
 
 fn to_string_ref(s: String) -> StringRef:
+    print("Converting: ", s)
     let slen = len(s)
-    let ptr = Pointer[UInt8]().alloc(slen + 1)
+    let ptr = Pointer[UInt8]().alloc(slen)
 
     memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
-    memset_zero(ptr.offset(slen), 1)
+    # memset_zero(ptr.offset(slen), 1)
 
-    return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen)
+    return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen + 1)
 
 
 fn match_path(path: String, pattern: StringRef) -> Bool:
@@ -469,9 +470,7 @@ fn wait_for_clients(
 
         var handler: fn (Request) -> Response = default_handler
         try:
-            print("before assign handler")
             handler = find_handler(app, path)
-            print("fast assign handler")
         except e:
             print("assigning not found handler")
             _ = write(client_socketfd, not_found, not_found_len)
@@ -483,13 +482,14 @@ fn wait_for_clients(
 
         # let params_data = app.get_params(buf, REQUEST_BUFFER_SIZE, find_pattern(path))
 
-        print("before request")
+        print("path:", path)
+        print("method:", method)
+        print("protocol_version:", protocol_version)
         let req = Request(
             to_string_ref(path),
             to_string_ref(method),
             to_string_ref(protocol_version),
         )
-        print("after request")
         # req._params = params_data
         # req.PARAMS = req.get_params_dict()
 
@@ -587,7 +587,7 @@ struct Application:
         memcpy(ptr, buf, i)
         ptr.store(i + 1, 0)
 
-        return String(ptr.bitcast[Int8](), i)
+        return String(ptr.bitcast[Int8](), i + 1)
 
     @always_inline
     fn get_path(self, buf: Pointer[UInt8], buflen: Int) -> String:
@@ -613,7 +613,7 @@ struct Application:
         memcpy(ptr, buf.offset(i), j - i)
         ptr.store(j - i + 1, 0)
 
-        return String(ptr.bitcast[Int8](), j - i)
+        return String(ptr.bitcast[Int8](), j - i + 1)
 
     @always_inline
     fn get_protocol_version(self, buf: Pointer[UInt8], buflen: Int) -> String:
@@ -652,7 +652,7 @@ struct Application:
         self, buf: Pointer[UInt8], buflen: Int, pattern: StringRef
     ) -> DynamicVector[StringRef]:
         # let pattern_string = String(pattern)
-        var res = DynamicVector[StringRef]()
+        let res = DynamicVector[StringRef]()
         # let path = self.get_path(buf, buflen)
 
         # var i = 0

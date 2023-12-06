@@ -4,7 +4,7 @@ from fire import json, Request, Response, Application
 
 
 fn index(request: Request) -> Response:
-    return Response("hello world")
+    return Response("hello world!!!")
 
 
 # fn get_post(request: Request) -> Response:
