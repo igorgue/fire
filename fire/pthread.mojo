@@ -308,7 +308,7 @@ fn pthread_exit(__retval: String) -> UInt8:
     let slen = len(__retval)
     let ptr = Pointer[UInt8]().alloc(slen)
 
-    memcpy(ptr, __retval._buffer.data.bitcast[UInt8](), slen)
+    memcpy(ptr, __retval._as_ptr().bitcast[DType.uint8](), slen)
 
     return external_call["pthread_exit", UInt8, Pointer[UInt8]](ptr)
 
