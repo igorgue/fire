@@ -347,19 +347,20 @@ struct Routes:
 
 
 fn to_string_ref(s: String) -> StringRef:
-    print("Converting: ", s)
     let slen = len(s)
     let ptr = Pointer[UInt8]().alloc(slen)
 
     memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
-    # memset_zero(ptr.offset(slen), 1)
 
-    return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen + 1)
+    return StringRef(ptr.bitcast[__mlir_type.`!pop.scalar<si8>`]().address, slen)
 
 
 fn match_path(path: String, pattern: StringRef) -> Bool:
     let path_len = len(path)
     let pattern_len = len(pattern)
+
+    # print("path:", path)
+    # print("pattern:", pattern)
 
     if pattern_len < path_len:
         return False
@@ -480,18 +481,22 @@ fn wait_for_clients(
 
             continue
 
-        # let params_data = app.get_params(buf, REQUEST_BUFFER_SIZE, find_pattern(path))
+        let params_data = app.get_params(
+            buf, REQUEST_BUFFER_SIZE, find_pattern(app, path)
+        )
 
-        print("path:", path)
-        print("method:", method)
-        print("protocol_version:", protocol_version)
-        let req = Request(
+        var req = Request(
             to_string_ref(path),
             to_string_ref(method),
             to_string_ref(protocol_version),
         )
-        # req._params = params_data
-        # req.PARAMS = req.get_params_dict()
+        req._params = params_data
+        req.PARAMS = req.get_params_dict()
+
+        try:
+            print(str(req.PARAMS.__getitem__("name")))
+        except e:
+            print("error:", e)
 
         respond_to_client(client_socketfd, req, handler)
 
@@ -650,54 +655,54 @@ struct Application:
 
     fn get_params(
         self, buf: Pointer[UInt8], buflen: Int, pattern: StringRef
-    ) -> DynamicVector[StringRef]:
-        # let pattern_string = String(pattern)
-        let res = DynamicVector[StringRef]()
-        # let path = self.get_path(buf, buflen)
+    ) -> DynamicVector[DodgyString]:
+        let pattern_string = String(pattern)
+        var res = DynamicVector[DodgyString]()
+        let path = self.get_path(buf, buflen)
 
-        # var i = 0
-        # var j = 0
-        # while i < len(path):
-        #     if (
-        #         path[i] == " "
-        #         or path[i] == "?"
-        #         or ord(path[i]) < 31
-        #         or ord(path[i]) > 128
-        #     ):
-        #         break
-        #
-        #     if pattern[j] == "{":
-        #         let name_start = j + 1
-        #
-        #         while pattern[j] != "}":
-        #             j += 1
-        #
-        #         let name_end = j
-        #         let name = pattern_string[name_start:name_end]
-        #
-        #         res.push_back(to_string_ref(name))
-        #
-        #         let value_start = i
-        #         while (
-        #             path[i] != "/"
-        #             and path[i] != " "
-        #             and ord(path[i]) > 31
-        #             and ord(path[i]) < 128
-        #         ):
-        #             i += 1
-        #         let value_end = i
-        #         let value = path[value_start:value_end]
-        #         res.push_back(to_string_ref(value))
-        #
-        #     if (
-        #         path[i] == " "
-        #         or path[i] == "?"
-        #         or ord(path[i]) < 31
-        #         or ord(path[i]) > 128
-        #     ):
-        #         break
-        #
-        #     i += 1
-        #     j += 1
+        var i = 0
+        var j = 0
+        while i < len(path):
+            if (
+                path[i] == " "
+                or path[i] == "?"
+                or ord(path[i]) < 31
+                or ord(path[i]) > 128
+            ):
+                break
+
+            if pattern[j] == "{":
+                let name_start = j + 1
+
+                while pattern[j] != "}":
+                    j += 1
+
+                let name_end = j
+                let name = pattern_string[name_start:name_end]
+
+                res.push_back(to_string_ref(name))
+
+                let value_start = i
+                while (
+                    path[i] != "/"
+                    and path[i] != " "
+                    and ord(path[i]) > 31
+                    and ord(path[i]) < 128
+                ):
+                    i += 1
+                let value_end = i
+                let value = path[value_start:value_end]
+                res.push_back(to_string_ref(value))
+
+            if (
+                path[i] == " "
+                or path[i] == "?"
+                or ord(path[i]) < 31
+                or ord(path[i]) > 128
+            ):
+                break
+
+            i += 1
+            j += 1
 
         return res
