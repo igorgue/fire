@@ -434,6 +434,10 @@ fn workers() -> Int:
     return num_cores() * WORKERS_PER_CORE
 
 
+fn default_handler(request: Request) -> Response:
+    return Response("")
+
+
 fn wait_for_clients(
     app: Application,
     socketfd: Int32,
@@ -463,7 +467,7 @@ fn wait_for_clients(
         let path = app.get_path(buf, REQUEST_BUFFER_SIZE)
         let protocol_version = app.get_protocol_version(buf, REQUEST_BUFFER_SIZE)
 
-        let handler: fn (Request) -> Response
+        var handler: fn (Request) -> Response = default_handler
         try:
             print("before assign handler")
             handler = find_handler(app, path)
