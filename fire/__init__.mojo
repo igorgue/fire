@@ -490,10 +490,11 @@ fn wait_for_clients(
         req._params = params_data
         req.PARAMS = req.get_params_dict()
 
+        # FIXME: remove this once we learn how to do access to these fields
         try:
             print(str(req.PARAMS.__getitem__("name")))
         except e:
-            print("error:", e)
+            print("> error:", e)
 
         respond_to_client(client_socketfd, req, handler)
 
