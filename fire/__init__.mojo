@@ -1,8 +1,6 @@
 import time
 
-from algorithm import parallelize, num_cores
-from memory import memcpy, memset_zero
-from memory.unsafe import bitcast
+from algorithm import num_cores
 from python import Python, Dictionary
 from collections.vector import InlinedFixedVector, DynamicVector
 
@@ -492,7 +490,7 @@ fn wait_for_clients(
 
         # FIXME: remove this once we learn how to do access to these fields
         try:
-            print(str(req.PARAMS.__getitem__("name")))
+            print(str(req.PARAMS["id"]))
         except e:
             print("> error:", e)
 
