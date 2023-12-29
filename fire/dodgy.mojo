@@ -1,6 +1,3 @@
-from memory import memcpy, memset_zero
-
-
 @value
 @register_passable("trivial")
 struct DodgyString(CollectionElement):
