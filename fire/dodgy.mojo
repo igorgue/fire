@@ -50,9 +50,6 @@ struct DodgyString(CollectionElement):
     fn __ne__(self, other: DodgyString) -> Bool:
         return not self.__eq__(other)
 
-    # fn __iter__(self) -> ListIterator[Int8]:
-    #     return ListIterator[Int8](self.data, self.size)
-
     fn to_string(self) -> String:
         let ptr = Pointer[Int8]().alloc(self.size + 1)
 
