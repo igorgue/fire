@@ -4,7 +4,7 @@ from algorithm import parallelize, num_cores
 from memory import memcpy, memset_zero
 from memory.unsafe import bitcast
 from python import Python, Dictionary
-from utils.vector import InlinedFixedVector, DynamicVector
+from collections.vector import InlinedFixedVector, DynamicVector
 
 from .dodgy import DodgyString
 
@@ -107,7 +107,6 @@ fn write(fildes: Int32, s: String, nbyte: Int) -> Int32:
     let slen = len(s)
     let ptr = Pointer[UInt8]().alloc(slen)
 
-    # memcpy(ptr, bitcast[UInt8](s._as_ptr().load().to_int()), slen)
     memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
 
     return external_call["write", Int, Int32, Pointer[UInt8], Int](fildes, ptr, nbyte)
