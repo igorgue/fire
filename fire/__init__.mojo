@@ -217,7 +217,6 @@ struct Response:
 
         return resp
 
-    @always_inline
     fn to_s(self: Self) -> String:
         return (
             "HTTP/1.1 "
@@ -395,8 +394,7 @@ fn find_handler(app: Application, path: String) raises -> fn (req: Request) -> R
 
         i += 1
 
-    print("Route not found")
-    raise Error("Route not found")
+    raise Error("Route not found: ")
 
 
 fn find_pattern(app: Application, path: String) -> StringRef:
