@@ -1,6 +1,6 @@
 import time
 
-from algorithm import num_cores
+from algorithm import num_physical_cores
 from python import Python, Dictionary
 from collections.vector import InlinedFixedVector, DynamicVector
 
@@ -428,7 +428,7 @@ fn respond_to_client(
 
 
 fn workers() -> Int:
-    return num_cores() * WORKERS_PER_CORE
+    return num_physical_cores() * WORKERS_PER_CORE
 
 
 fn default_handler(request: Request) -> Response:
