@@ -4,7 +4,7 @@ from fire import json, Request, Response, Application
 
 
 fn index(request: Request) -> Response:
-    return Response("hello world yo!!!")
+    return Response("burn baby burn 🔥!")
 
 
 fn main():
