@@ -305,8 +305,8 @@ fn pthread_join(__th: pthread_t) -> Int32:
 
 
 fn pthread_exit(__retval: String) -> UInt8:
-    let slen = len(__retval)
-    let ptr = Pointer[UInt8]().alloc(slen)
+    var slen = len(__retval)
+    var ptr = Pointer[UInt8]().alloc(slen)
 
     memcpy(ptr, __retval._as_ptr().bitcast[DType.uint8](), slen)
 

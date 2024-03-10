@@ -12,9 +12,9 @@ struct DodgyString(CollectionElement):
     var size: Int
 
     fn __init__(value: StringLiteral) -> DodgyString:
-        let l = len(value)
-        let s = String(value)
-        let p = Pointer[Int8].alloc(l)
+        var l = len(value)
+        var s = String(value)
+        var p = Pointer[Int8].alloc(l)
 
         for i in range(l):
             p.store(i, s._buffer[i])
@@ -22,8 +22,8 @@ struct DodgyString(CollectionElement):
         return DodgyString(p, l)
 
     fn __init__(value: String) -> DodgyString:
-        let l = len(value)
-        let p = Pointer[Int8].alloc(l)
+        var l = len(value)
+        var p = Pointer[Int8].alloc(l)
 
         for i in range(l):
             p.store(i, value._buffer[i])
@@ -31,9 +31,9 @@ struct DodgyString(CollectionElement):
         return DodgyString(p, l)
 
     fn __init__(value: StringRef) -> DodgyString:
-        let l = len(value)
-        let s = String(value)
-        let p = Pointer[Int8].alloc(l)
+        var l = len(value)
+        var s = String(value)
+        var p = Pointer[Int8].alloc(l)
 
         for i in range(l):
             p.store(i, s._buffer[i])
@@ -57,7 +57,7 @@ struct DodgyString(CollectionElement):
         return ListIterator[Int8](self.data, self.size)
 
     fn to_string(self) -> String:
-        let ptr = Pointer[Int8]().alloc(self.size + 1)
+        var ptr = Pointer[Int8]().alloc(self.size + 1)
 
         memcpy(ptr, self.data, self.size)
         memset_zero(ptr.offset(self.size), 1)
@@ -65,7 +65,7 @@ struct DodgyString(CollectionElement):
         return String(ptr, self.size)
 
     fn to_string_ref(self) -> StringRef:
-        let ptr = Pointer[Int8]().alloc(self.size + 1)
+        var ptr = Pointer[Int8]().alloc(self.size + 1)
 
         memcpy(ptr, self.data, self.size)
         memset_zero(ptr.offset(self.size), 1)

@@ -16,6 +16,6 @@ struct ListIterator[T: AnyRegType]:
         return self.max - self.offset
 
     fn __next__(inout self) -> T:
-        let ret = self.storage.load(self.offset)
+        var ret = self.storage.load(self.offset)
         self.offset += 1
         return ret

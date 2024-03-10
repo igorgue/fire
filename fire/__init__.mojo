@@ -102,8 +102,8 @@ fn read(fildes: Int32, buf: Pointer[UInt8], nbyte: Int) -> Int32:
 
 
 fn write(fildes: Int32, s: String, nbyte: Int) -> Int32:
-    let slen = len(s)
-    let ptr = Pointer[UInt8]().alloc(slen)
+    var slen = len(s)
+    var ptr = Pointer[UInt8]().alloc(slen)
 
     memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
 
@@ -115,8 +115,8 @@ fn close(fildes: Int32) -> Int32:
 
 
 fn perror(s: String):
-    let slen = len(s)
-    let ptr = Pointer[UInt8]().alloc(len(s))
+    var slen = len(s)
+    var ptr = Pointer[UInt8]().alloc(len(s))
 
     memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
 
@@ -177,8 +177,8 @@ struct Response:
         resp.content_type = "application/json"
 
         try:
-            let py_json = Python.import_module("json")
-            let content = py_json.dumps(data.py_object)
+            var py_json = Python.import_module("json")
+            var content = py_json.dumps(data.py_object)
 
             resp.content = to_string_ref(str(content))
         except e:
@@ -194,8 +194,8 @@ struct Response:
         resp.content_type = "application/json"
 
         try:
-            let py_json = Python.import_module("json")
-            let content = py_json.dumps(data)
+            var py_json = Python.import_module("json")
+            var content = py_json.dumps(data)
 
             resp.content = to_string_ref(str(content))
         except e:
@@ -287,7 +287,7 @@ struct Request:
         self.DATA = Python.dict()
 
     fn get_params_dict(self) -> Dictionary:
-        let res = Python.dict()
+        var res = Python.dict()
 
         try:
             var i = 0
@@ -301,7 +301,7 @@ struct Request:
         return res
 
     fn get_qs_dict(self) -> Dictionary:
-        let res = Python.dict()
+        var res = Python.dict()
 
         try:
             var i = 0
@@ -315,7 +315,7 @@ struct Request:
         return res
 
     fn get_data_dict(self) -> Dictionary:
-        let res = Python.dict()
+        var res = Python.dict()
 
         try:
             var i = 0
@@ -343,8 +343,8 @@ struct Routes:
 
 
 fn to_string_ref(s: String) -> StringRef:
-    let slen = len(s)
-    let ptr = Pointer[UInt8]().alloc(slen)
+    var slen = len(s)
+    var ptr = Pointer[UInt8]().alloc(slen)
 
     memcpy(ptr, s._as_ptr().bitcast[DType.uint8](), slen)
 
@@ -352,8 +352,8 @@ fn to_string_ref(s: String) -> StringRef:
 
 
 fn match_path(path: String, pattern: StringRef) -> Bool:
-    let path_len = len(path)
-    let pattern_len = len(pattern)
+    var path_len = len(path)
+    var pattern_len = len(pattern)
 
     # print("path:", path)
     # print("pattern:", pattern)
@@ -421,7 +421,7 @@ fn respond_to_client(
     req: Request,
     handler: fn (Request) -> Response,
 ):
-    let res = handler(req).to_s()
+    var res = handler(req).to_s()
 
     _ = write(client_socketfd, res, len(res))
     _ = close(client_socketfd)
@@ -441,14 +441,14 @@ fn wait_for_clients(
     inout address_sock: sockaddr,
 ):
     while True:
-        let client_socketfd: Int32
-        let not_found = http_404().to_s()
-        let not_found_len = len(not_found)
+        var client_socketfd: Int32
+        var not_found = http_404().to_s()
+        var not_found_len = len(not_found)
         var start: Int = 0
         var bytes_received: Int32 = 0
         var sin_size = UInt32(sizeof[UInt32]())
 
-        let buf = Pointer[UInt8].alloc(REQUEST_BUFFER_SIZE)
+        var buf = Pointer[UInt8].alloc(REQUEST_BUFFER_SIZE)
         client_socketfd = accept(socketfd, address_sock, sin_size)
 
         if client_socketfd < 0:
@@ -460,9 +460,9 @@ fn wait_for_clients(
 
         bytes_received = read(client_socketfd, buf, REQUEST_BUFFER_SIZE)
 
-        let method = app.get_method(buf, REQUEST_BUFFER_SIZE)
-        let path = app.get_path(buf, REQUEST_BUFFER_SIZE)
-        let protocol_version = app.get_protocol_version(buf, REQUEST_BUFFER_SIZE)
+        var method = app.get_method(buf, REQUEST_BUFFER_SIZE)
+        var path = app.get_path(buf, REQUEST_BUFFER_SIZE)
+        var protocol_version = app.get_protocol_version(buf, REQUEST_BUFFER_SIZE)
 
         var handler: fn (Request) -> Response = default_handler
         try:
@@ -476,7 +476,7 @@ fn wait_for_clients(
 
             continue
 
-        let params_data = app.get_params(
+        var params_data = app.get_params(
             buf, REQUEST_BUFFER_SIZE, find_pattern(app, path)
         )
 
@@ -499,7 +499,7 @@ fn wait_for_clients(
         if DEBUG:
             var log = "[" + method + "] " + path
 
-            let total = (time.now() - start) // 1000
+            var total = (time.now() - start) // 1000
             if total > 1000:
                 log += " " + String(total // 1000) + " ms " + bytes_received + " bytes"
             else:
@@ -528,11 +528,11 @@ struct Application:
     fn run(inout self):
         load_python_modules()
 
-        let socketfd: Int32
+        var socketfd: Int32
 
         var address = sockaddr_in()
         var opt: UInt8 = SO_REUSEADDR
-        let addrlen = sizeof[sockaddr_in]()
+        var addrlen = sizeof[sockaddr_in]()
 
         socketfd = socket(AF_INET, SOCK_STREAM, 0)
         if socketfd < 0:
@@ -584,7 +584,7 @@ struct Application:
                 break
             i += 1
 
-        let ptr = Pointer[UInt8].alloc(i + 1)
+        var ptr = Pointer[UInt8].alloc(i + 1)
         memcpy(ptr, buf, i)
         ptr.store(i + 1, 0)
 
@@ -610,7 +610,7 @@ struct Application:
             j += 1
 
         # write path
-        let ptr = Pointer[UInt8].alloc(j - i + 1)
+        var ptr = Pointer[UInt8].alloc(j - i + 1)
         memcpy(ptr, buf.offset(i), j - i)
         ptr.store(j - i + 1, 0)
 
@@ -644,7 +644,7 @@ struct Application:
             j += 1
 
         # write protocol version
-        let ptr = Pointer[UInt8].alloc(j - i)
+        var ptr = Pointer[UInt8].alloc(j - i)
         memcpy(ptr, buf.offset(i), j - i)
 
         return String(ptr.bitcast[Int8](), j - i)
@@ -652,9 +652,9 @@ struct Application:
     fn get_params(
         self, buf: Pointer[UInt8], buflen: Int, pattern: StringRef
     ) -> DynamicVector[DodgyString]:
-        let pattern_string = String(pattern)
+        var pattern_string = String(pattern)
         var res = DynamicVector[DodgyString]()
-        let path = self.get_path(buf, buflen)
+        var path = self.get_path(buf, buflen)
 
         var i = 0
         var j = 0
@@ -668,17 +668,17 @@ struct Application:
                 break
 
             if pattern[j] == "{":
-                let name_start = j + 1
+                var name_start = j + 1
 
                 while pattern[j] != "}":
                     j += 1
 
-                let name_end = j
-                let name = pattern_string[name_start:name_end]
+                var name_end = j
+                var name = pattern_string[name_start:name_end]
 
                 res.push_back(to_string_ref(name))
 
-                let value_start = i
+                var value_start = i
                 while (
                     path[i] != "/"
                     and path[i] != " "
@@ -686,8 +686,8 @@ struct Application:
                     and ord(path[i]) < 128
                 ):
                     i += 1
-                let value_end = i
-                let value = path[value_start:value_end]
+                var value_end = i
+                var value = path[value_start:value_end]
                 res.push_back(to_string_ref(value))
 
             if (
